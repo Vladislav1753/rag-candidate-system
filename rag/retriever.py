@@ -1,53 +1,95 @@
-import numpy as np
-from rag.vector_store.faiss_store import load_faiss_index
+import logging
+import asyncpg
+from typing import Optional, Dict, Any
 from rag.embedding.embedder import Embedder
 
-TOP_K = 10
-EMBED_MODEL = "text-embedding-3-small"
+logger = logging.getLogger("retriever")
+embedder = Embedder()
 
-def embed_query(query, model_name=EMBED_MODEL):
-    """
-    Вернуть вектор запроса (np.float32).
-    Здесь embedder.embed_batch возвращает list[vector], берем первый элемент.
-    """
-    embedder = Embedder(model_name=model_name)
-    vec = embedder.embed_batch([query], batch_size=1)[0]
-    return np.array(vec, dtype="float32")
 
-def search(query, top_k=TOP_K):
+async def search_candidates(
+    query: Optional[str], filters: Dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
+):
     """
-    Поиск top_k кандидатов по FAISS.
-    Возвращает список метаданных (metadata entries) с расстояниями.
+    Performs a hybrid search in PostgreSQL:
+    - If `query` is provided -> Semantic Search (Vector).
+    - If `filters` are provided -> Exact match/Range filters (SQL).
+    - If both are provided -> Hybrid Search (Filter first, then rank by similarity).
     """
-    # 1) загружаем индекс и metadata
-    index, metadata = load_faiss_index()
 
-    # 2) получаем вектор запроса
-    q_vec = embed_query(query)
-    q_vec = q_vec.reshape(1, -1)
+    where_clauses = []
+    args = []
 
-    # 3) делаем поиск
-    distances, indices = index.search(q_vec, top_k)
+    if filters.get("location"):
+        args.append(filters["location"])
+        # Dynamic parameter index: $1, $2, etc.
+        where_clauses.append(f"location = ${len(args)}")
+
+    if filters.get("min_experience"):
+        args.append(filters["min_experience"])
+        where_clauses.append(f"years_experience >= ${len(args)}")
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    similarity_col = "0 as similarity"
+    order_by_sql = "ORDER BY created_at DESC"
+
+    if query:
+        try:
+            query_vector = embedder.embed_batch([query])[0]
+            vector_str = str(query_vector)
+
+            args.append(vector_str)
+            vec_param_idx = len(args)
+
+            similarity_col = (
+                f"1 - (embedding <=> ${vec_param_idx}::vector) as similarity"
+            )
+            order_by_sql = f"ORDER BY embedding <=> ${vec_param_idx}::vector"
+
+        except Exception as e:
+            logger.error(f"Embedding generation failed: {e}")
+            return []
+
+    sql = f"""
+        SELECT
+            id,
+            full_name,
+            professional_title,
+            summary_generated,
+            years_experience,
+            location,
+            {similarity_col}
+        FROM candidates
+        {where_sql}
+        {order_by_sql}
+        LIMIT ${len(args) + 1}
+    """
+
+    args.append(top_k)
 
     results = []
-    for dist, idx in zip(distances[0], indices[0]):
-        # idx — позиция вектора в индексе (0..N-1)
-        # metadata — список словарей в том же порядке, что и векторы
-        if idx < 0:
-            continue
-        meta = metadata[idx]
-        results.append({"score": float(dist), "meta": meta})
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(sql, *args)
+
+            for row in rows:
+                results.append(
+                    {
+                        "id": str(row["id"]),
+                        "full_name": row["full_name"],
+                        "professional_title": row["professional_title"],
+                        "location": row["location"],
+                        "years_experience": row["years_experience"],
+                        "summary": row["summary_generated"],
+                        "score": float(row["similarity"]),
+                    }
+                )
+
+    except Exception as e:
+        logger.error(f"Database search failed: {e}")
+        return []
 
     return results
-
-if __name__ == "__main__":
-    while True:
-        q = input("\nQuery (or 'exit')> ").strip()
-        if q.lower() in ("exit", "quit"):
-            break
-        res = search(q, top_k=5)
-        print(f"Found {len(res)} results:")
-        for i, r in enumerate(res, 1):
-            m = r["meta"]
-            print(f"{i}. {m.get('full_name','<no name>')} — {m.get('professional_title','')} — score={r['score']:.4f}")
-            print("   summary:", m.get("summary_generated","")[:200])

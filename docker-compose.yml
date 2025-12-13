@@ -1,10 +1,10 @@
-version: '3.9'  
+version: '3.9'
 
 services:
   postgres:
-    image: postgres:15          
-    container_name: candidate_pg 
-    restart: unless-stopped     
+    image: pgvector/pgvector:pg15
+    container_name: candidate_pg
+    restart: unless-stopped
     ports:
       - "5433:5432"
     env_file:
@@ -17,4 +17,4 @@ services:
       - pgdata:/var/lib/postgresql/data
 
 volumes:
-  pgdata:                        
+  pgdata:

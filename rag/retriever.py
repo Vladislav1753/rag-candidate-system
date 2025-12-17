@@ -2,6 +2,7 @@ import logging
 import asyncpg
 from typing import Optional, Dict, Any
 from rag.embedding.embedder import Embedder
+import json
 
 logger = logging.getLogger("retriever")
 embedder = Embedder()
@@ -54,19 +55,24 @@ async def search_candidates(
             return []
 
     sql = f"""
-        SELECT
-            id,
-            full_name,
-            professional_title,
-            summary_generated,
-            years_experience,
-            location,
-            {similarity_col}
-        FROM candidates
-        {where_sql}
-        {order_by_sql}
-        LIMIT ${len(args) + 1}
-    """
+            SELECT
+                id,
+                full_name,
+                email,
+                skills,
+                professional_title,
+                summary_generated,
+                years_experience,
+                location,
+                phone,
+                education,
+                spoken_languages,
+                {similarity_col}
+            FROM candidates
+            {where_sql}
+            {order_by_sql}
+            LIMIT ${len(args) + 1}
+        """
 
     args.append(top_k)
 
@@ -76,14 +82,26 @@ async def search_candidates(
             rows = await conn.fetch(sql, *args)
 
             for row in rows:
+                skills_data = row["skills"]
+                if isinstance(skills_data, str):
+                    try:
+                        skills_data = json.loads(skills_data)
+                    except json.JSONDecodeError:
+                        skills_data = {}
+
                 results.append(
                     {
                         "id": str(row["id"]),
                         "full_name": row["full_name"],
+                        "email": row["email"],
                         "professional_title": row["professional_title"],
                         "location": row["location"],
                         "years_experience": row["years_experience"],
                         "summary": row["summary_generated"],
+                        "skills": skills_data,
+                        "phone": row["phone"],
+                        "education": row["education"],
+                        "languages": row["spoken_languages"],
                         "score": float(row["similarity"]),
                     }
                 )

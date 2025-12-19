@@ -5,12 +5,14 @@ import os
 
 from dotenv import load_dotenv
 
-from app.services.parser import extract_text_from_pdf
-from rag.onboarding_graph import app_workflow
-
 load_dotenv()
 
 sys.path.append(os.getcwd())
+# pylint: disable=wrong-import-position
+from app.services.parser import extract_text_from_pdf
+from rag.onboarding_graph import app_workflow
+
+# pylint: enable=wrong-import-position
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 

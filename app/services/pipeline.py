@@ -8,20 +8,23 @@ embedder = Embedder()
 logger = logging.getLogger("pipeline")
 
 
-def _prepare_text_for_summary(data: CandidateInput) -> str:
-    """Formats the candidate data into a string for the LLM to generate a summary."""
-    return f"""
-    Name: {data.full_name}
-    Title: {data.professional_title}
-    Experience: {data.years_experience} years
-    Skills: {data.skills}
-    Work History: {data.work_history}
-    Projects: {data.projects}
-    Location: {data.location}
-    Spoken Languages: {data.spoken_languages}
-    Education: {data.education}
-    Certifications: {data.certifications}
+def _prepare_candidate_data_dict(data: CandidateInput) -> dict:
     """
+    Converts CandidateInput Pydantic model to dict for SummaryAgent.
+    SummaryAgent now handles both dict and raw text formats.
+    """
+    return {
+        "full_name": data.full_name,
+        "professional_title": data.professional_title or "",
+        "years_experience": data.years_experience or 0,
+        "skills": str(data.skills) if data.skills else "",
+        "location": data.location or "",
+        "projects": str(data.projects) if data.projects else "",
+        "work_history": str(data.work_history) if data.work_history else "",
+        "education": data.education or "",
+        "certifications": str(data.certifications) if data.certifications else "",
+        "spoken_languages": str(data.spoken_languages) if data.spoken_languages else "",
+    }
 
 
 def _prepare_text_for_embedding(data: CandidateInput, summary: str) -> str:
@@ -52,8 +55,9 @@ async def process_candidate_background(
     logger.info(f"Starting background processing for {candidate_id}")
 
     try:
-        text_for_summary = _prepare_text_for_summary(data)
-        summary = summary_agent.generate_summary(text_for_summary)
+        # Convert CandidateInput to dict for unified SummaryAgent
+        candidate_dict = _prepare_candidate_data_dict(data)
+        summary = summary_agent.generate_summary(candidate_dict)
 
         text_for_embed = _prepare_text_for_embedding(data, summary)
         vector_list = embedder.embed_batch([text_for_embed])[0]

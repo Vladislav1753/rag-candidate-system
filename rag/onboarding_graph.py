@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from typing import Optional
 from langgraph.graph import StateGraph, END
+from rag.agents.summary_agent import SummaryAgent
 
 load_dotenv()
 
@@ -55,6 +56,7 @@ class OnboardingState(TypedDict):
 
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
+summary_agent = SummaryAgent()
 
 
 def extractor_agent(state: OnboardingState):
@@ -80,36 +82,21 @@ def extractor_agent(state: OnboardingState):
     return {"extracted_data": result.model_dump()}
 
 
-def summary_agent(state: OnboardingState):
+def summary_agent_node(state: OnboardingState):
     """Agent 2 (Summarizer): Writes a summary based on clean, structured data."""
     print("--- SUMMARY AGENT WORKING ---")
     data = state["extracted_data"]
 
-    prompt = ChatPromptTemplate.from_template(
-        """
-        You are an HR Evaluation Expert. Write a professional executive summary (3-4 sentences)
-        for this candidate based on their extracted data.
+    # Use unified SummaryAgent with structured data
+    summary_text = summary_agent.generate_summary(data)
 
-        Candidate Data:
-        Name: {full_name}
-        Title: {professional_title}
-        Experience: {years_experience} years
-        Skills: {skills}
-
-        Start directly with the candidate's name. Highlight key strengths.
-        """
-    )
-
-    chain = prompt | llm
-    response = chain.invoke(data)
-
-    return {"final_summary": response.content}
+    return {"final_summary": summary_text}
 
 
 workflow = StateGraph(OnboardingState)
 
 workflow.add_node("extractor", extractor_agent)
-workflow.add_node("summarizer", summary_agent)
+workflow.add_node("summarizer", summary_agent_node)
 
 workflow.set_entry_point("extractor")
 workflow.add_edge("extractor", "summarizer")

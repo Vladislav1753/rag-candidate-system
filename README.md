@@ -1,0 +1,101 @@
+
+# 🤖 AI Recruitment Assistant (RAG + LangGraph)
+
+An intelligent Application Tracking System (ATS) powered by **Hybrid Search** (Semantic + Keyword) and **AI Agents** for automated resume analysis.
+
+The project is built with a modern microservices architecture and fully orchestrated using **Docker Compose**.
+
+## 🏗 Architecture
+
+The system consists of three isolated services running in a private Docker network:
+
+1.  **Backend (FastAPI)**: Handles business logic, PDF parsing, embedding generation, and database interactions.
+2.  **Frontend (Streamlit)**: An interactive UI for recruiters to onboard candidates and perform advanced searches.
+3.  **Database (PostgreSQL + pgvector)**: Stores structured candidate data and vector embeddings for similarity search.
+
+```mermaid
+graph LR
+    User(Recruiter) -->|UI Interaction| Frontend[Streamlit Container]
+    Frontend -->|HTTP Requests| Backend[FastAPI Container]
+    Backend -->|SQL & Vector Search| DB[(PostgreSQL + pgvector)]
+    Backend -->|Embeddings & Summary| OpenAI[OpenAI API]
+```
+
+## 🚀 Key Features
+
+* **📄 Intelligent Parsing:** A **LangGraph**-based workflow that extracts structured data (Skills, Experience, Education) from PDF resumes of any format.
+* **🧠 AI Summarization:** Automatically generates concise professional profiles using GPT-4o.
+* **🔎 Hybrid Search Engine:**
+* *Semantic Search:* Finds candidates by meaning (e.g., "Python developer with Fintech experience") using vector embeddings.
+* *Keyword/Filter Search:* Standard SQL filtering (Location, Years of Experience).
+* *Combined Mode:* Filters first, then ranks by semantic similarity.
+* **🐳 Dockerized:** One-command deployment for the entire stack.
+
+## 🛠 Tech Stack
+
+* **Language:** Python 3.11
+* **Orchestration:** Docker & Docker Compose
+* **Backend:** FastAPI, Pydantic, Asyncpg
+* **Frontend:** Streamlit
+* **Database:** PostgreSQL 15, pgvector extension
+* **AI & LLM:** LangChain, LangGraph, OpenAI (GPT-4o / Text-Embeddings-3-Small)
+
+## ⚙️ Installation & Setup
+
+### Prerequisites
+
+* Docker & Docker Compose installed
+* An OpenAI API Key
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Vladislav1753/rag-candidate-system.git
+cd rag-candidate-system
+```
+
+### 2. Environment Setup
+
+Create a `.env` file in the root directory:
+
+```ini
+DB_USER=admin
+DB_PASSWORD=admin
+DB_NAME=candidates
+DB_PORT=5433
+
+OPENAI_API_KEY=sk-your-openai-key-here
+
+# Backend URL for local development (Overridden automatically in Docker)
+API_URL=[http://127.0.0.1:8000](http://127.0.0.1:8000)
+```
+
+### 3. Run with Docker
+
+Build and start the containers:
+
+```bash
+docker compose up --build -d
+```
+
+### 4. Access the Application
+
+Once the containers are running:
+
+* **Frontend UI:** [http://localhost:8501](https://www.google.com/search?q=http://localhost:8501)
+* **Backend Docs (Swagger):** [http://localhost:8000/docs](https://www.google.com/search?q=http://localhost:8000/docs)
+* **Database:** `localhost:5433` (User/Pass: admin/admin)
+
+## 🧪 Development
+
+To stop the containers:
+
+```bash
+docker compose down
+```
+
+To view logs (useful for debugging):
+
+```bash
+docker compose logs -f
+```

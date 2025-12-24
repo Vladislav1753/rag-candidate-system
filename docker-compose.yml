@@ -15,6 +15,47 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - rag_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: rag_backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    networks:
+      - rag_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rag_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      API_URL: http://backend:8000
+    networks:
+      - rag_net
 
 volumes:
   pgdata:
+
+networks:
+  rag_net:
+    driver: bridge

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import sys
@@ -12,27 +13,44 @@ from app.services.onboarding import (
 )
 from app.services.pipeline import process_candidate_background
 from rag.retriever import search_candidates
+from rag.reranker import RerankerService
+from rag.onboarding_graph import app_workflow
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
+logger = logging.getLogger("main")
 
 db_pool = None
+reranker = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_pool
-    print("Connecting to Database...")
+    global db_pool, reranker
+    logger.info("Connecting to Database...")
     db_pool = await init_db_pool()
+
+    logger.info("Loading Reranker model (CrossEncoder)...")
+    reranker = RerankerService()
+
     yield
-    print("Closing Database connection...")
-    await db_pool.close()
+    if db_pool:
+        logger.info("Closing Database connection...")
+        await db_pool.close()
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class SearchRequest(BaseModel):
@@ -40,6 +58,28 @@ class SearchRequest(BaseModel):
     location: Optional[str] = None
     min_experience: Optional[int] = None
     top_k: int = 5
+
+
+class ExtractRequest(BaseModel):
+    raw_text: str
+
+
+@app.post("/extract")
+async def extract_from_pdf(req: ExtractRequest):
+    if not req.raw_text or len(req.raw_text.strip()) < 10:
+        raise HTTPException(status_code=400, detail="PDF text is too short or empty.")
+
+    try:
+        result = app_workflow.invoke({"raw_text": req.raw_text})
+
+        return {
+            "status": "success",
+            "extracted_data": result.get("extracted_data", {}),
+            "final_summary": result.get("final_summary", ""),
+        }
+    except Exception as e:
+        logger.error(f"Extraction failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/onboarding")
@@ -65,10 +105,32 @@ async def search_endpoint(req: SearchRequest):
     if not db_pool:
         raise HTTPException(status_code=500, detail="Database not initialized")
 
-    filters = {"location": req.location, "min_experience": req.min_experience}
+    if not reranker:
+        raise HTTPException(status_code=500, detail="Reranker not initialized")
 
-    results = await search_candidates(
+    filters = {}
+    if req.location:
+        filters["location"] = req.location
+    if req.min_experience:
+        filters["min_experience"] = req.min_experience
+
+    candidates = await search_candidates(
         query=req.query, filters=filters, db_pool=db_pool, top_k=req.top_k
     )
 
-    return {"results": results}
+    logger.info(f"Database found {len(candidates)} candidates. Query: '{req.query}'")
+
+    if not candidates:
+        return {"results": []}
+
+    if req.query:
+        try:
+            ranked_results = reranker.rank_candidates(
+                query=req.query, candidates=candidates, top_k=req.top_k
+            )
+            logger.info(f"Reranking complete. Returning {len(ranked_results)} results.")
+            return {"results": ranked_results}
+        except Exception as e:
+            logger.error(f"Reranking error: {e}")
+            return {"results": candidates[: req.top_k]}
+    return {"results": candidates[: req.top_k]}

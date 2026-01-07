@@ -19,16 +19,16 @@ graph LR
     Frontend -->|HTTP Requests| Backend[FastAPI Container]
     Backend -->|SQL & Vector Search| DB[(PostgreSQL + pgvector)]
     Backend -->|Embeddings & Summary| OpenAI[OpenAI API]
+    Backend -->|Re-scoring| Reranker[Cross-Encoder Model]
 ```
 
 ## 🚀 Key Features
 
 * **📄 Intelligent Parsing:** A **LangGraph**-based workflow that extracts structured data (Skills, Experience, Education) from PDF resumes of any format.
 * **🧠 AI Summarization:** Automatically generates concise professional profiles using GPT-4o.
-* **🔎 Hybrid Search Engine:**
-* *Semantic Search:* Finds candidates by meaning (e.g., "Python developer with Fintech experience") using vector embeddings.
-* *Keyword/Filter Search:* Standard SQL filtering (Location, Years of Experience).
-* *Combined Mode:* Filters first, then ranks by semantic similarity.
+* **🎯 Two-Stage Search Engine (RAG):**
+* **Stage 1: Retrieval (Hybrid Search):** Quickly fetches top candidates using **Vector Search** (OpenAI Embeddings) combined with **SQL Filters** (Location, Experience) via pgvector.
+* **Stage 2: Reranking (Precision):** A specialized **Cross-Encoder model** (`ms-marco-MiniLM-L-6-v2`) deeply analyzes the retrieved candidates against the query to re-rank them, ensuring the most relevant results appear at the top.
 * **🐳 Dockerized:** One-command deployment for the entire stack.
 
 ## 🛠 Tech Stack
@@ -39,6 +39,7 @@ graph LR
 * **Frontend:** Streamlit
 * **Database:** PostgreSQL 15, pgvector extension
 * **AI & LLM:** LangChain, LangGraph, OpenAI (GPT-4o / Text-Embeddings-3-Small)
+* **ML & Reranking:** sentence-transformers (CrossEncoder)
 
 ## ⚙️ Installation & Setup
 

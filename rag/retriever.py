@@ -8,9 +8,25 @@ logger = logging.getLogger("retriever")
 embedder = Embedder()
 
 
+def _parse_json_field(field_data: Any, default_val: Any) -> Any:
+    """
+    Safe JSON parser helper.
+    Internal utility for this module.
+    """
+    if field_data is None:
+        return default_val
+    if isinstance(field_data, str):
+        try:
+            return json.loads(field_data)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse JSON field: {field_data[:50]}...")
+            return default_val
+    return field_data
+
+
 async def search_candidates(
     query: Optional[str], filters: Dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
-):
+) -> list[Dict[str, Any]]:
     """
     Performs a hybrid search in PostgreSQL:
     - If `query` is provided -> Semantic Search (Vector).
@@ -59,14 +75,18 @@ async def search_candidates(
                 id,
                 full_name,
                 email,
-                skills,
-                professional_title,
-                summary_generated,
-                years_experience,
-                location,
                 phone,
-                education,
+                location,
                 spoken_languages,
+                professional_title,
+                years_experience,
+                skills,
+                tools_technologies,
+                projects,
+                work_history,
+                education,
+                certifications,
+                summary_generated,
                 {similarity_col}
             FROM candidates
             {where_sql}
@@ -74,7 +94,8 @@ async def search_candidates(
             LIMIT ${len(args) + 1}
         """
 
-    args.append(top_k)
+    initial_fetch_k = top_k * 4 if query else top_k
+    args.append(initial_fetch_k)
 
     results = []
     try:
@@ -82,26 +103,23 @@ async def search_candidates(
             rows = await conn.fetch(sql, *args)
 
             for row in rows:
-                skills_data = row["skills"]
-                if isinstance(skills_data, str):
-                    try:
-                        skills_data = json.loads(skills_data)
-                    except json.JSONDecodeError:
-                        skills_data = {}
-
                 results.append(
                     {
                         "id": str(row["id"]),
                         "full_name": row["full_name"],
                         "email": row["email"],
-                        "professional_title": row["professional_title"],
-                        "location": row["location"],
-                        "years_experience": row["years_experience"],
-                        "summary": row["summary_generated"],
-                        "skills": skills_data,
                         "phone": row["phone"],
-                        "education": row["education"],
+                        "location": row["location"],
                         "languages": row["spoken_languages"],
+                        "professional_title": row["professional_title"],
+                        "years_experience": row["years_experience"],
+                        "skills": _parse_json_field(row["skills"], {}),
+                        "tools": _parse_json_field(row["tools_technologies"], []),
+                        "projects": _parse_json_field(row["projects"], []),
+                        "work_history": _parse_json_field(row["work_history"], []),
+                        "education": row["education"],
+                        "certifications": row["certifications"],
+                        "summary": row["summary_generated"],
                         "score": float(row["similarity"]),
                     }
                 )

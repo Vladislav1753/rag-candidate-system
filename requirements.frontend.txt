@@ -1,0 +1,7 @@
+streamlit>=1.52.1
+pandas>=2.3.3
+httpx>=0.28.1
+python-dotenv>=1.2.1
+pydantic>=2.12.5
+pypdf>=6.4.2
+requests>=2.31.0

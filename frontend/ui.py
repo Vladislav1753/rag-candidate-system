@@ -1,26 +1,12 @@
 import streamlit as st
 import requests
 import os
-from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
-
-
-def extract_text_from_pdf(uploaded_file) -> str:
-    """Extracts raw text from an uploaded PDF file."""
-    try:
-        reader = PdfReader(uploaded_file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-        return ""
 
 
 st.set_page_config(page_title="RAG Recruiter AI", page_icon="🤖", layout="wide")
@@ -132,64 +118,71 @@ with tab2:
     if uploaded_file is not None:
         if st.button("✨ Extract All Data with AI"):
             with st.spinner("Analyzing PDF... Parsing complex fields..."):
-                raw_text = extract_text_from_pdf(uploaded_file)
-                if raw_text:
-                    try:
-                        response = requests.post(
-                            f"{API_URL}/extract",
-                            json={"raw_text": raw_text},
-                            timeout=60,
+                try:
+                    # Reset file pointer to beginning
+                    uploaded_file.seek(0)
+
+                    files = {
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.read(),
+                            "application/pdf",
+                        )
+                    }
+
+                    response = requests.post(
+                        f"{API_URL}/extract", files=files, timeout=60
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        data = result.get("extracted_data", {})
+                        summary = result.get("final_summary", "")
+
+                        st.session_state.form_data["full_name"] = data.get(
+                            "full_name", ""
+                        )
+                        st.session_state.form_data["email"] = data.get("email", "")
+                        st.session_state.form_data["phone"] = data.get("phone", "")
+                        st.session_state.form_data["location"] = data.get(
+                            "location", ""
+                        )
+                        st.session_state.form_data["title"] = data.get(
+                            "professional_title", ""
+                        )
+                        st.session_state.form_data["exp"] = data.get(
+                            "years_experience", 0
+                        )
+                        st.session_state.form_data["education"] = data.get(
+                            "education", ""
+                        )
+                        st.session_state.form_data["summary_preview"] = summary
+
+                        st.session_state.form_data["skills"] = ", ".join(
+                            data.get("skills", [])
+                        )
+                        st.session_state.form_data["tools"] = ", ".join(
+                            data.get("tools_technologies", [])
+                        )
+                        st.session_state.form_data["langs"] = ", ".join(
+                            data.get("spoken_languages", [])
+                        )
+                        st.session_state.form_data["certs"] = "\n".join(
+                            data.get("certifications", [])
                         )
 
-                        if response.status_code == 200:
-                            result = response.json()
-                            data = result.get("extracted_data", {})
-                            summary = result.get("final_summary", "")
+                        st.session_state.form_data["projects"] = "\n".join(
+                            data.get("projects", [])
+                        )
+                        st.session_state.form_data["work"] = "\n".join(
+                            data.get("work_history", [])
+                        )
 
-                            st.session_state.form_data["full_name"] = data.get(
-                                "full_name", ""
-                            )
-                            st.session_state.form_data["email"] = data.get("email", "")
-                            st.session_state.form_data["phone"] = data.get("phone", "")
-                            st.session_state.form_data["location"] = data.get(
-                                "location", ""
-                            )
-                            st.session_state.form_data["title"] = data.get(
-                                "professional_title", ""
-                            )
-                            st.session_state.form_data["exp"] = data.get(
-                                "years_experience", 0
-                            )
-                            st.session_state.form_data["education"] = data.get(
-                                "education", ""
-                            )
-                            st.session_state.form_data["summary_preview"] = summary
-
-                            st.session_state.form_data["skills"] = ", ".join(
-                                data.get("skills", [])
-                            )
-                            st.session_state.form_data["tools"] = ", ".join(
-                                data.get("tools_technologies", [])
-                            )
-                            st.session_state.form_data["langs"] = ", ".join(
-                                data.get("spoken_languages", [])
-                            )
-                            st.session_state.form_data["certs"] = "\n".join(
-                                data.get("certifications", [])
-                            )
-
-                            st.session_state.form_data["projects"] = "\n".join(
-                                data.get("projects", [])
-                            )
-                            st.session_state.form_data["work"] = "\n".join(
-                                data.get("work_history", [])
-                            )
-
-                            st.success("Extraction Complete! Review details below.")
-                        else:
-                            st.error(f"Error: {response.status_code} - {response.text}")
-                    except Exception as e:
-                        st.error(f"Failed to connect to backend: {e}")
+                        st.success("Extraction Complete! Review details below.")
+                    else:
+                        st.error(f"Error: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"Failed to connect to backend: {e}")
 
     st.divider()
 

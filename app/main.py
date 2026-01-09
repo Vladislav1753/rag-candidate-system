@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -12,6 +12,7 @@ from app.services.onboarding import (
     init_db_pool,
 )
 from app.services.pipeline import process_candidate_background
+from app.services.parser import extract_text_from_pdf
 from rag.retriever import search_candidates
 from rag.reranker import RerankerService
 from rag.onboarding_graph import app_workflow
@@ -60,17 +61,21 @@ class SearchRequest(BaseModel):
     top_k: int = 5
 
 
-class ExtractRequest(BaseModel):
-    raw_text: str
-
-
 @app.post("/extract")
-async def extract_from_pdf(req: ExtractRequest):
-    if not req.raw_text or len(req.raw_text.strip()) < 10:
+async def extract_from_pdf(file: UploadFile = File(...)):
+    logger.info(f"Receiving file: {file.filename}")
+
+    try:
+        raw_text = extract_text_from_pdf(file.file)
+    except Exception as e:
+        logger.error(f"PDF parsing failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid PDF file") from e
+
+    if not raw_text or len(raw_text.strip()) < 10:
         raise HTTPException(status_code=400, detail="PDF text is too short or empty.")
 
     try:
-        result = app_workflow.invoke({"raw_text": req.raw_text})
+        result = app_workflow.invoke({"raw_text": raw_text})
 
         return {
             "status": "success",
@@ -78,7 +83,7 @@ async def extract_from_pdf(req: ExtractRequest):
             "final_summary": result.get("final_summary", ""),
         }
     except Exception as e:
-        logger.error(f"Extraction failed: {e}", exc_info=True)
+        logger.error(f"Extraction workflow failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

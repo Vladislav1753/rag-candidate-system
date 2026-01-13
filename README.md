@@ -79,7 +79,17 @@ Build and start the containers:
 docker compose up --build -d
 ```
 
-### 4. Access the Application
+### 4. Populate the Database (Optional)
+
+If you want to seed the database with sample candidates from a CSV file, run the migration script:
+
+```bash
+python -m scripts.migrate_csv
+```
+
+> **Note:** Make sure you have a `data/candidates_pool.csv` file prepared. The script will read the CSV, generate embeddings for each candidate, and insert them into PostgreSQL.
+
+### 5. Access the Application
 
 Once the containers are running:
 

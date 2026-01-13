@@ -12,7 +12,6 @@ env/
 .idea/
 .vscode/
 
-data/*.csv
 data/*.json
 data/*.pkl
 data/*.bin

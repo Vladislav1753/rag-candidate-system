@@ -1,15 +1,11 @@
 import asyncio
 import os
-import sys
 import json
 import uuid
 from datetime import datetime
 import pandas as pd
 from app.services.onboarding import init_db_pool
 from rag.embedding.embedder import Embedder
-
-sys.path.append(os.getcwd())
-
 
 CSV_PATH = "data/candidates_pool.csv"
 
@@ -35,6 +31,7 @@ async def migrate():
             parts = [
                 row.get("professional_title", ""),
                 row.get("skills", ""),
+                row.get("tools_technologies", ""),
                 row.get("years_experience", ""),
                 row.get("summary_generated", ""),
                 row.get("location", ""),
@@ -50,30 +47,44 @@ async def migrate():
                 print(f"Skipping {row.get('full_name')} due to error: {e}")
                 continue
 
-            raw_skills = row.get("skills", "{}")
-
+            raw_skills = row.get("skills", "")
             if isinstance(raw_skills, str) and raw_skills.strip():
                 skills_list = [s.strip() for s in raw_skills.split(",") if s.strip()]
-                skills_json = json.dumps({"imported": skills_list})
             else:
-                skills_json = json.dumps({})
+                skills_list = []
+
+            raw_tools = row.get("tools_technologies", "")
+            if isinstance(raw_tools, str) and raw_tools.strip():
+                tools_list = [t.strip() for t in raw_tools.split(",") if t.strip()]
+            else:
+                tools_list = []
+
+            raw_langs = row.get("spoken_languages", "")
+            if isinstance(raw_langs, str) and raw_langs.strip():
+                langs_list = [l.strip() for l in raw_langs.split(",") if l.strip()]
+            else:
+                langs_list = []
 
             query = """
-                    INSERT INTO candidates (id, full_name, professional_title, \
-                                            years_experience, skills, location, \
-                                            summary_generated, embedding, created_at, updated_at) \
-                    VALUES ($1, $2, $3, $4, $5::json, $6, $7, $8::vector, $9, $9) \
+                    INSERT INTO candidates (
+                        id, full_name, email, professional_title,
+                        years_experience, skills, tools_technologies,
+                        spoken_languages, location, summary_generated,
+                        embedding, created_at, updated_at
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6::json, $7::json, $8, $9, $10, $11::vector, $12, $12)
                     """
 
             await conn.execute(
                 query,
                 cid,
                 row.get("full_name", "Unknown"),
+                row.get("email", ""),
                 row.get("professional_title", ""),
-                int(row.get("years_experience", 0))
-                if row.get("years_experience")
-                else 0,
-                skills_json,
+                int(row.get("years_experience") or 0),
+                json.dumps(skills_list),
+                json.dumps(tools_list),
+                langs_list,
                 row.get("location", ""),
                 row.get("summary_generated", ""),
                 vector_str,

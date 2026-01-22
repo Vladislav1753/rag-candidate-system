@@ -27,8 +27,9 @@ graph LR
 * **📄 Intelligent Parsing:** A **LangGraph**-based workflow that extracts structured data (Skills, Experience, Education) from PDF resumes of any format.
 * **🧠 AI Summarization:** Automatically generates concise professional profiles using GPT-4o.
 * **🎯 Two-Stage Search Engine (RAG):**
-* **Stage 1: Retrieval (Hybrid Search):** Quickly fetches top candidates using **Vector Search** (OpenAI Embeddings) combined with **SQL Filters** (Location, Experience) via pgvector.
-* **Stage 2: Reranking (Precision):** A specialized **Cross-Encoder model** (`ms-marco-MiniLM-L-6-v2`) deeply analyzes the retrieved candidates against the query to re-rank them, ensuring the most relevant results appear at the top.
+  * **Stage 1: Retrieval (Hybrid Search):** Quickly fetches top candidates using **Vector Search** (OpenAI Embeddings) combined with **SQL Filters** (Location, Experience) via pgvector.
+  * **Stage 2: Reranking (Precision):** A specialized **Cross-Encoder model** (`ms-marco-MiniLM-L-6-v2`) deeply analyzes the retrieved candidates against the query to re-rank them, ensuring the most relevant results appear at the top.
+* **📊 RAG Evaluation System:** Comprehensive evaluation framework to measure and compare search quality with metrics like Precision@K, Recall@K, MRR, NDCG, and MAP. Includes automated test query generation and HTML report visualization.
 * **🐳 Dockerized:** One-command deployment for the entire stack.
 
 ## 🛠 Tech Stack
@@ -96,6 +97,25 @@ Once the containers are running:
 * **Frontend UI:** [http://localhost:8501](https://www.google.com/search?q=http://localhost:8501)
 * **Backend Docs (Swagger):** [http://localhost:8000/docs](https://www.google.com/search?q=http://localhost:8000/docs)
 * **Database:** `localhost:5433` (User/Pass: admin/admin)
+
+## 📊 RAG Evaluation
+
+The project includes a comprehensive evaluation system to measure and improve search quality.
+
+To run the evaluation suite and generate quality metrics reports:
+
+```bash
+# Generate synthetic test queries
+python evaluation/test_queries.py
+
+# Run evaluation with metrics calculation
+python evaluation/run_evaluation.py
+
+# Generate HTML report with visualizations
+python evaluation/generate_report.py
+```
+
+📖 **For detailed information about the evaluation system, metrics used, and how to interpret results, see [evaluation/README.md](evaluation/README.md)**
 
 ## 🧪 Development
 

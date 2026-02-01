@@ -18,6 +18,23 @@ services:
     networks:
       - rag_net
 
+  redis:
+    image: redis:7-alpine
+    container_name: candidate_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   backend:
     build:
       context: .
@@ -26,6 +43,7 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
+      - redis
     ports:
       - "8000:8000"
     env_file:
@@ -33,6 +51,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      REDIS_URL: redis://redis:6379
     networks:
       - rag_net
 
@@ -55,6 +74,7 @@ services:
 
 volumes:
   pgdata:
+  redis_data:
 
 networks:
   rag_net:

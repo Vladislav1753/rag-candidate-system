@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks, HTTPException, File, UploadFile
+from fastapi import FastAPI, BackgroundTasks, HTTPException, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import sys
 import logging
+from slowapi.errors import RateLimitExceeded
 
 from app.services.onboarding import (
     CandidateOnboardingService,
@@ -13,6 +14,13 @@ from app.services.onboarding import (
 )
 from app.services.pipeline import process_candidate_background
 from app.services.parser import extract_text_from_pdf
+from app.middleware.rate_limit import (
+    limiter,
+    rate_limit_exceeded_handler,
+    RATE_LIMIT_SEARCH,
+    RATE_LIMIT_ONBOARDING,
+    RATE_LIMIT_EXTRACT,
+)
 from rag.retriever import search_candidates
 from rag.reranker import RerankerService
 from rag.onboarding_graph import app_workflow
@@ -45,6 +53,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Add rate limiter state to app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,7 +74,8 @@ class SearchRequest(BaseModel):
 
 
 @app.post("/extract")
-async def extract_from_pdf(file: UploadFile = File(...)):
+@limiter.limit(RATE_LIMIT_EXTRACT)
+async def extract_from_pdf(request: Request, file: UploadFile = File(...)):
     logger.info(f"Receiving file: {file.filename}")
 
     try:
@@ -88,7 +101,10 @@ async def extract_from_pdf(file: UploadFile = File(...)):
 
 
 @app.post("/onboarding")
-async def onboard_candidate(data: CandidateInput, background_tasks: BackgroundTasks):
+@limiter.limit(RATE_LIMIT_ONBOARDING)
+async def onboard_candidate(
+    request: Request, data: CandidateInput, background_tasks: BackgroundTasks
+):
     if not db_pool:
         raise HTTPException(status_code=500, detail="Database not initialized")
 
@@ -106,7 +122,8 @@ async def onboard_candidate(data: CandidateInput, background_tasks: BackgroundTa
 
 
 @app.post("/search")
-async def search_endpoint(req: SearchRequest):
+@limiter.limit(RATE_LIMIT_SEARCH)
+async def search_endpoint(request: Request, req: SearchRequest):
     if not db_pool:
         raise HTTPException(status_code=500, detail="Database not initialized")
 

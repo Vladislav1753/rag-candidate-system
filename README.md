@@ -30,6 +30,7 @@ graph LR
   * **Stage 1: Retrieval (Hybrid Search):** Quickly fetches top candidates using **Vector Search** (OpenAI Embeddings) combined with **SQL Filters** (Location, Experience) via pgvector.
   * **Stage 2: Reranking (Precision):** A specialized **Cross-Encoder model** (`ms-marco-MiniLM-L-6-v2`) deeply analyzes the retrieved candidates against the query to re-rank them, ensuring the most relevant results appear at the top.
 * **📊 RAG Evaluation System:** Comprehensive evaluation framework to measure and compare search quality with metrics like Precision@K, Recall@K, MRR, NDCG, and MAP. Includes automated test query generation and HTML report visualization.
+* **🔒 Rate Limiting:** Protects API endpoints from abuse with configurable request limits per time window, supporting both IP-based and API key-based throttling.
 * **🐳 Dockerized:** One-command deployment for the entire stack.
 
 ## 🛠 Tech Stack
@@ -70,6 +71,13 @@ OPENAI_API_KEY=sk-your-openai-key-here
 
 # Backend URL for local development (Overridden automatically in Docker)
 API_URL=[http://127.0.0.1:8000](http://127.0.0.1:8000)
+
+# Rate Limiting Configuration (Optional)
+# Format: "number/time_unit" where time_unit can be: second, minute, hour, day
+RATE_LIMIT_SEARCH=20/minute       # Search endpoint limit
+RATE_LIMIT_ONBOARDING=10/minute   # Candidate onboarding limit
+RATE_LIMIT_EXTRACT=10/minute      # PDF extraction limit
+RATE_LIMIT_DEFAULT=100/minute     # Default for all other endpoints
 ```
 
 ### 3. Run with Docker
@@ -116,6 +124,12 @@ python evaluation/generate_report.py
 ```
 
 📖 **For detailed information about the evaluation system, metrics used, and how to interpret results, see [evaluation/README.md](evaluation/README.md)**
+
+## 🔒 Rate Limiting
+
+The API includes built-in rate limiting to protect against abuse and ensure fair usage. Each endpoint has configurable request limits.
+
+📖 **For detailed information about rate limiting configuration, usage, and best practices, see [app/middleware/README.md](app/middleware/README.md)**
 
 ## 🧪 Development
 

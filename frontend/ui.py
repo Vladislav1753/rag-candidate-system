@@ -19,12 +19,64 @@ tab1, tab2 = st.tabs(["🔍 Search Candidates", "➕ Add New Candidate"])
 with tab1:
     st.header("Find the perfect match")
 
+    if "search_query" not in st.session_state:
+        st.session_state.search_query = ""
+    if "original_query" not in st.session_state:
+        st.session_state.original_query = ""
+    if "is_expanded" not in st.session_state:
+        st.session_state.is_expanded = False
+
+    def on_query_change():
+        st.session_state.is_expanded = False
+        st.session_state.original_query = ""
+
+    def expand_callback():
+        current_query = st.session_state.search_query
+
+        if not current_query or len(current_query.strip()) < 2:
+            st.warning("⚠️ Please enter a query (at least 2 characters)")
+            return
+
+        try:
+            response = requests.post(
+                f"{API_URL}/expand-query",
+                json={"query": current_query},
+                timeout=30,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                expanded_text = result.get("expanded_query", "")
+
+                if expanded_text and expanded_text.strip() != current_query.strip():
+                    st.session_state.original_query = current_query
+                    st.session_state.search_query = expanded_text
+                    st.session_state.is_expanded = True
+                    st.toast("✅ Query improved!", icon="✨")
+                else:
+                    st.toast("ℹ️ Query is already optimal!", icon="ℹ️")
+            else:
+                st.error(f"❌ Error: {response.status_code}")
+        except Exception as e:
+            st.error(f"❌ Connection Failed: {e}")
+
+    def restore_callback():
+        """Returning old text"""
+        st.session_state.search_query = st.session_state.original_query
+        st.session_state.is_expanded = False
+        st.session_state.original_query = ""
+        st.toast("↩️ Restored original query")
+
     col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
-        query = st.text_input(
-            "Search Query", placeholder="e.g. 'Python developer with AWS experience'"
+        st.text_input(
+            "Search Query",
+            placeholder="e.g. 'Python developer with AWS experience'",
+            key="search_query",
+            on_change=on_query_change,
         )
+
     with col2:
         location = st.text_input("Location Filter", placeholder="e.g. New York")
     with col3:
@@ -32,14 +84,41 @@ with tab1:
             "Min Experience (Years)", min_value=0, max_value=20, value=0
         )
 
+    btn_col1, btn_col2, btn_spacer = st.columns([1.2, 1.2, 1.6])
+
+    with btn_col1:
+        st.button(
+            "Expand Query with AI",
+            use_container_width=True,
+            disabled=st.session_state.is_expanded,
+            on_click=expand_callback,
+        )
+
+    with btn_col2:
+        if st.session_state.is_expanded:
+            st.button(
+                "↩️ Restore Original",
+                use_container_width=True,
+                on_click=restore_callback,
+            )
+
+    if st.session_state.is_expanded:
+        st.info(
+            f"🔄 **Expanded from:** `{st.session_state.original_query}` \n\n"
+            f"⬇️ \n\n"
+            f"**To:** `{st.session_state.search_query}`"
+        )
+
     top_k = st.slider("Number of results", 1, 10, 3)
 
-    if st.button("Search", type="primary"):
-        if not query and not location:
+    if st.button("🔍 Search", type="primary"):
+        final_query = st.session_state.search_query
+
+        if not final_query and not location:
             st.warning("Please enter a query or location.")
         else:
             payload = {
-                "query": query if query else None,
+                "query": final_query if final_query else None,
                 "location": location if location else None,
                 "min_experience": min_exp,
                 "top_k": top_k,
@@ -58,8 +137,11 @@ with tab1:
                             st.success(f"Found {len(results)} candidates!")
 
                             for cand in results:
+                                score_display = (
+                                    f"({cand['score']:.2f})" if "score" in cand else ""
+                                )
                                 with st.expander(
-                                    f"**{cand['full_name']}** - {cand['professional_title']} ({cand['score']:.2f})"
+                                    f"**{cand['full_name']}** - {cand['professional_title']} {score_display}"
                                 ):
                                     c1, c2 = st.columns(2)
                                     with c1:

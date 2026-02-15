@@ -16,7 +16,7 @@ class CacheService:
 
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
-        self.ttl = int(os.getenv("CACHE_TTL", "3600"))  # Default: 1 hour
+        self.ttl = int(os.getenv("CACHE_TTL", "86400"))  # Default: 24 hours
 
     @staticmethod
     def _generate_cache_key(query: Optional[str], filters: Dict[str, Any]) -> str:
@@ -27,6 +27,11 @@ class CacheService:
         }
         cache_string = json.dumps(cache_data, sort_keys=True)
         return f"search:{hashlib.md5(cache_string.encode()).hexdigest()}"
+
+    def _generate_expansion_key(self, query: str) -> str:
+        """Generate a unique cache key for expansion queries."""
+        normalized = query.strip().lower()
+        return f"expand:{hashlib.md5(normalized.encode()).hexdigest()}"
 
     async def get_cached_results(
         self, query: Optional[str], filters: Dict[str, Any]
@@ -54,6 +59,22 @@ class CacheService:
 
         except Exception as e:
             logger.error(f"Cache retrieval error: {e}")
+            return None
+
+    async def get_expanded_query(self, query: str) -> Optional[str]:
+        """Get cached expanded query string.
+
+        Args:
+            query: Original search query string
+
+        Returns:
+            Cached expanded query or None if not found
+        """
+        try:
+            key = self._generate_expansion_key(query)
+            return await self.redis.get(key)
+        except Exception as e:
+            logger.error(f"Expansion cache get error: {e}")
             return None
 
     async def set_cached_results(
@@ -85,6 +106,23 @@ class CacheService:
 
         except Exception as e:
             logger.error(f"Cache storage error: {e}")
+            return False
+
+    async def set_expanded_query(self, query: str, expanded_value: str) -> bool:
+        """Cache the expanded query string.
+
+        Args:
+            query: Original search query string
+            expanded_value: Expanded query string to cache
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            key = self._generate_expansion_key(query)
+            await self.redis.setex(key, self.ttl, expanded_value)
+            return True
+        except Exception as e:
+            logger.error(f"Expansion cache set error: {e}")
             return False
 
     async def invalidate_cache(self, pattern: str = "search:*") -> int:
@@ -119,6 +157,25 @@ class CacheService:
             logger.error(f"Cache invalidation error: {e}")
             return 0
 
+    async def _count_keys(self, pattern: str) -> int:
+        """Helper to count keys by pattern.
+
+        Args:
+            pattern: Redis key pattern to count
+        Returns:
+            Total number of keys matching the pattern
+        """
+        count = 0
+        cursor = 0
+        while True:
+            cursor, keys = await self.redis.scan(
+                cursor=cursor, match=pattern, count=100
+            )
+            count += len(keys)
+            if cursor == 0:
+                break
+        return count
+
     async def get_cache_stats(self) -> Dict[str, Any]:
         """
         Get cache statistics.
@@ -129,28 +186,26 @@ class CacheService:
         try:
             info = await self.redis.info("stats")
 
-            search_keys = 0
-            cursor = 0
-            while True:
-                cursor, keys = await self.redis.scan(
-                    cursor=cursor, match="search:*", count=100
-                )
-                search_keys += len(keys)
-                if cursor == 0:
-                    break
+            search_keys = await self._count_keys("search:*")
+            expand_keys = await self._count_keys("expand:*")
+
+            total_hits = info.get("keyspace_hits", 0)
+            total_misses = info.get("keyspace_misses", 0)
 
             return {
-                "total_commands_processed": info.get("total_commands_processed", 0),
-                "keyspace_hits": info.get("keyspace_hits", 0),
-                "keyspace_misses": info.get("keyspace_misses", 0),
-                "search_keys_count": search_keys,
+                "redis_total_commands": info.get("total_commands_processed", 0),
+                "total_hits": total_hits,
+                "total_misses": total_misses,
                 "hit_rate": (
-                    info.get("keyspace_hits", 0)
-                    / max(
-                        info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1
-                    )
-                    * 100
+                    (total_hits / (total_hits + total_misses) * 100)
+                    if (total_hits + total_misses) > 0
+                    else 0
                 ),
+                "breakdown": {
+                    "search_keys": search_keys,
+                    "expand_keys": expand_keys,
+                    "total_rag_keys": search_keys + expand_keys,
+                },
             }
 
         except Exception as e:

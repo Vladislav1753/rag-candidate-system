@@ -11,7 +11,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Literal
 import sys
 import logging
 import os
@@ -32,10 +32,12 @@ from app.middleware.rate_limit import (
     RATE_LIMIT_SEARCH,
     RATE_LIMIT_ONBOARDING,
     RATE_LIMIT_EXTRACT,
+    RATE_LIMIT_DEFAULT,
 )
 from rag.retriever import search_candidates
 from rag.reranker import RerankerService
 from rag.onboarding_graph import app_workflow
+from rag.agents.query_expansion_agent import QueryExpansionAgent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,12 +50,13 @@ db_pool = None
 reranker = None
 redis_client = None
 cache_service = None
+query_expander = None
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_pool, reranker, redis_client, cache_service
+    global db_pool, reranker, redis_client, cache_service, query_expander
     logger.info("Connecting to Database...")
     db_pool = await init_db_pool()
 
@@ -63,6 +66,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("Loading Reranker model (CrossEncoder)...")
     reranker = RerankerService()
+
+    logger.info("Initializing Query Expansion Agent...")
+    query_expander = QueryExpansionAgent()
 
     yield
     if db_pool:
@@ -103,6 +109,10 @@ class SearchRequest(BaseModel):
     location: Optional[str] = None
     min_experience: Optional[int] = None
     top_k: int = 5
+
+
+class InvalidateCacheRequest(BaseModel):
+    scopes: List[Literal["search", "expand"]] = ["search", "expand"]
 
 
 @app.post("/extract")
@@ -151,6 +161,56 @@ async def onboard_candidate(
     background_tasks.add_task(process_candidate_background, candidate_id, data, db_pool)
 
     return {"status": "processing", "candidate_id": candidate_id}
+
+
+@app.post("/expand-query")
+@limiter.limit(RATE_LIMIT_DEFAULT)
+async def expand_query_endpoint(request: Request, req: SearchRequest):
+    """
+    Expand a simple search query into a more detailed and comprehensive version.
+    Example: 'python lead' -> 'Senior Python Developer, Team Lead, Django, Flask, Architecture'
+
+    The expanded query is returned and can be used to update the SearchRequest.query field.
+    """
+    if not query_expander:
+        raise HTTPException(status_code=500, detail="Query expander not initialized")
+
+    if not cache_service:
+        raise HTTPException(status_code=500, detail="Cache service not initialized")
+
+    if not req.query or len(req.query.strip()) < 2:
+        raise HTTPException(
+            status_code=400, detail="Query must be at least 2 characters long"
+        )
+
+    cached_expansion = await cache_service.get_expanded_query(req.query)
+
+    if cached_expansion:
+        logger.info(f"Expansion Cache HIT: '{req.query}'")
+        return {
+            "status": "success",
+            "original_query": req.query,
+            "expanded_query": cached_expansion,
+            "cached": True,
+        }
+
+    try:
+        expanded_query = query_expander.expand_query(req.query)
+        logger.info(f"Query expansion: '{req.query}' -> '{expanded_query}'")
+
+        await cache_service.set_expanded_query(req.query, expanded_query)
+
+        return {
+            "status": "success",
+            "original_query": req.query,
+            "expanded_query": expanded_query,
+            "cached": False,
+        }
+    except Exception as e:
+        logger.error(f"Query expansion failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Query expansion failed: {str(e)}"
+        ) from e
 
 
 @app.post("/search")
@@ -208,14 +268,30 @@ async def search_endpoint(request: Request, req: SearchRequest):
 
 
 @app.post("/cache/invalidate", dependencies=[Depends(verify_admin)])
-async def invalidate_cache():
-    """Invalidate all search cache. Requires admin API key."""
+async def invalidate_cache(req: InvalidateCacheRequest = InvalidateCacheRequest()):
+    """
+    Invalidate cache.
+    By default, invalidates ALL caches.
+    To invalidate specific parts, pass a JSON body: {"scopes": ["search"]}
+    Requires admin API key.
+    """
 
     if not cache_service:
         raise HTTPException(status_code=500, detail="Cache service not initialized")
 
-    deleted_count = await cache_service.invalidate_cache()
-    return {"status": "success", "deleted_keys": deleted_count}
+    results = {"search": 0, "expanded_queries": 0, "total": 0}
+
+    if "search" in req.scopes:
+        deleted = await cache_service.invalidate_cache("search:*")
+        results["search"] = deleted
+
+    if "expand" in req.scopes:
+        deleted = await cache_service.invalidate_cache("expand:*")
+        results["expanded_queries"] = deleted
+
+    results["total"] = results["search"] + results["expanded_queries"]
+
+    return {"status": "success", "deleted_keys": results}
 
 
 @app.get("/cache/stats", dependencies=[Depends(verify_admin)])

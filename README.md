@@ -170,6 +170,50 @@ With caching enabled:
 
 📖 **For detailed information about caching architecture, configuration, and best practices, see [app/core/README.md](app/core/README.md)**
 
+## ✨ Query Expansion
+
+The system includes an AI-powered query expansion feature that automatically improves search queries for better candidate matching.
+
+### How It Works
+
+The Query Expansion Agent uses GPT-4o-mini to transform simple, vague queries into detailed, comprehensive search terms:
+
+* **Input:** `python lead`
+* **Output:** `Senior Python Developer, Team Lead, Django, Flask, FastAPI, System Architecture, Microservices`
+
+### Usage in Frontend
+
+1. Enter your search query in the search box
+2. Click **"Expand Query with AI"** button
+3. The AI will expand your query with relevant terms
+4. Review the improved query (displayed in the search box)
+5. If satisfied, click **"Search"** to find candidates
+6. If not satisfied, click **"↩️ Restore Original"** to revert
+
+### API Endpoint
+
+```bash
+curl -X POST http://localhost:8000/expand-query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "python lead"}'
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "original_query": "python lead",
+  "expanded_query": "Senior Python Developer, Team Lead, Django, Flask, FastAPI, System Architecture, Microservices"
+}
+```
+
+### Benefits
+
+* **Better Search Results:** More comprehensive queries match more relevant candidates
+* **Save Time:** No need to manually think of all relevant terms
+* **Discover Related Skills:** The AI suggests technologies and skills you might have forgotten
+* **Consistent Quality:** Ensures searches include industry-standard terminology
+
 ## 🧪 Development
 
 To stop the containers:

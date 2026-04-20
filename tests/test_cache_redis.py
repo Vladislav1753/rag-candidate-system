@@ -44,33 +44,45 @@ async def test_cache_basic_operations():
 
     try:
         # Test cache miss
-        result = await cache_service.get_cached_results("test query", {})
+        result = await cache_service.get_cached_results("test query", {}, 5)
         assert result is None, "Expected cache miss for new query"
 
         # Test cache set
         test_results = [
             {"id": 1, "name": "John Doe", "score": 0.95},
             {"id": 2, "name": "Jane Smith", "score": 0.87},
+            {"id": 3, "name": "Bob Lee", "score": 0.80},
         ]
         success = await cache_service.set_cached_results("test query", {}, test_results)
         assert success, "Cache set should succeed"
 
-        # Test cache hit
-        cached = await cache_service.get_cached_results("test query", {})
-        assert cached is not None, "Expected cache hit"
-        assert len(cached) == 2, "Expected 2 cached results"
-        assert cached[0]["name"] == "John Doe"
+        # Requesting <= cached count → cache hit, sliced
+        cached_3 = await cache_service.get_cached_results("test query", {}, 3)
+        assert cached_3 is not None, "Expected cache hit for top_k=3"
+        assert len(cached_3) == 3
+
+        cached_2 = await cache_service.get_cached_results("test query", {}, 2)
+        assert cached_2 is not None, "Expected cache hit for top_k=2"
+        assert len(cached_2) == 2
+        assert cached_2[0]["name"] == "John Doe"
+
+        # Requesting > cached count → cache miss (insufficient)
+        cached_10 = await cache_service.get_cached_results("test query", {}, 10)
+        assert cached_10 is None, "Expected cache miss when top_k > cached count"
 
         # Test cache with filters
         filters = {"location": "New York", "min_experience": 5}
         await cache_service.set_cached_results("test query", filters, test_results)
-        cached_filtered = await cache_service.get_cached_results("test query", filters)
+
+        cached_filtered = await cache_service.get_cached_results(
+            "test query", filters, 3
+        )
         assert cached_filtered is not None, "Expected cache hit with filters"
 
-        # Test different filters result in different cache keys
+        # Different filters → different cache key → miss
         different_filters = {"location": "San Francisco", "min_experience": 3}
         cached_different = await cache_service.get_cached_results(
-            "test query", different_filters
+            "test query", different_filters, 3
         )
         assert cached_different is None, "Expected cache miss with different filters"
 
@@ -79,12 +91,80 @@ async def test_cache_basic_operations():
         assert deleted >= 2, f"Expected at least 2 keys deleted, got {deleted}"
 
         # Verify cache is empty after invalidation
-        cached_after = await cache_service.get_cached_results("test query", {})
+        cached_after = await cache_service.get_cached_results("test query", {}, 3)
         assert cached_after is None, "Expected cache miss after invalidation"
 
     finally:
-        # Cleanup
-        if "redis_client" in locals():
+        if "cache_service" in locals() and "redis_client" in locals():
+            await cache_service.invalidate_cache("search:*")
+            await redis_client.close()
+
+
+@pytest.mark.asyncio
+async def test_cache_no_downgrade():
+    """Test that a smaller result set never overwrites a larger cached one."""
+    try:
+        redis_client = await init_redis_pool()
+    except Exception:
+        pytest.skip("Redis not available")
+        return
+
+    cache_service = CacheService(redis_client)
+
+    try:
+        await cache_service.invalidate_cache("search:*")
+
+        large = [{"id": i} for i in range(10)]
+        await cache_service.set_cached_results("q", {}, large)
+
+        small = [{"id": i} for i in range(3)]
+        await cache_service.set_cached_results("q", {}, small)
+
+        # Cache should still have 10 items
+        cached = await cache_service.get_cached_results("q", {}, 10)
+        assert cached is not None, "Expected 10 items to still be cached"
+        assert len(cached) == 10, f"Expected 10, got {len(cached)}"
+
+    finally:
+        if "cache_service" in locals() and "redis_client" in locals():
+            await cache_service.invalidate_cache("search:*")
+            await redis_client.close()
+
+
+@pytest.mark.asyncio
+async def test_cache_upgrade():
+    """Test that a larger result set upgrades the cache."""
+    try:
+        redis_client = await init_redis_pool()
+    except Exception:
+        pytest.skip("Redis not available")
+        return
+
+    cache_service = CacheService(redis_client)
+
+    try:
+        await cache_service.invalidate_cache("search:*")
+
+        small = [{"id": i} for i in range(5)]
+        await cache_service.set_cached_results("q", {}, small)
+
+        # top_k=10 should be a miss (only 5 cached)
+        result = await cache_service.get_cached_results("q", {}, 10)
+        assert result is None, "Expected cache miss when requesting more than cached"
+
+        large = [{"id": i} for i in range(10)]
+        await cache_service.set_cached_results("q", {}, large)
+
+        # Now top_k=10 should hit
+        result = await cache_service.get_cached_results("q", {}, 10)
+        assert result is not None and len(result) == 10
+
+        # And top_k=5 still hits
+        result5 = await cache_service.get_cached_results("q", {}, 5)
+        assert result5 is not None and len(result5) == 5
+
+    finally:
+        if "cache_service" in locals() and "redis_client" in locals():
             await cache_service.invalidate_cache("search:*")
             await redis_client.close()
 
@@ -101,16 +181,13 @@ async def test_cache_stats():
     cache_service = CacheService(redis_client)
 
     try:
-        # Clear cache first
         await cache_service.invalidate_cache("search:*")
         await cache_service.invalidate_cache("expand:*")
 
-        # Add some test data
         test_results = [{"id": 1, "name": "Test"}]
         await cache_service.set_cached_results("query1", {}, test_results)
         await cache_service.set_cached_results("query2", {}, test_results)
 
-        # Get stats
         stats = await cache_service.get_cache_stats()
 
         assert "breakdown" in stats
@@ -121,8 +198,9 @@ async def test_cache_stats():
         assert "total_misses" in stats or "keyspace_misses" in stats
 
     finally:
-        await cache_service.invalidate_cache("search:*")
-        await redis_client.close()
+        if "cache_service" in locals() and "redis_client" in locals():
+            await cache_service.invalidate_cache("search:*")
+            await redis_client.close()
 
 
 @pytest.mark.asyncio
@@ -133,7 +211,7 @@ async def test_cache_key_generation():
 
     # pylint: disable=protected-access
 
-    # 1. Search Keys
+    # 1. Search Keys — same query+filters always produce same key regardless of top_k
     key1 = cache_service._generate_cache_key("test", {"loc": "NY"})
     key2 = cache_service._generate_cache_key("test", {"loc": "NY"})
     assert key1 == key2, "Same inputs should produce same cache key"
@@ -144,16 +222,14 @@ async def test_cache_key_generation():
     key4 = cache_service._generate_cache_key("test", {"loc": "SF"})
     assert key1 != key4, "Different filters should produce different cache keys"
 
-    # Order of filters shouldn't matter
+    # Filter order shouldn't matter
     key5 = cache_service._generate_cache_key("test", {"a": 1, "b": 2})
     key6 = cache_service._generate_cache_key("test", {"b": 2, "a": 1})
     assert key5 == key6, "Filter order should not affect cache key"
 
     # 2. Expansion Keys
     exp_key1 = cache_service._generate_expansion_key("Python Developer")
-    exp_key2 = cache_service._generate_expansion_key(
-        "python developer"
-    )  # normalization test
+    exp_key2 = cache_service._generate_expansion_key("python developer")
     assert exp_key1 == exp_key2, "Expansion keys should be case-insensitive"
 
 
@@ -188,9 +264,8 @@ def test_cache_invalidate_with_valid_api_key(client):
     response = client.post(
         "/cache/invalidate",
         headers={"X-API-Key": "test-admin-key-123"},
-        json={"scopes": ["search"]},  # Explicitly clear search only
+        json={"scopes": ["search"]},
     )
-    # Check 200 OK (assuming Redis is up, otherwise 500)
     if response.status_code == 200:
         data = response.json()
         assert data["status"] == "success"
@@ -206,7 +281,7 @@ def test_cache_stats_with_valid_api_key(client):
         data = response.json()
         assert data["status"] == "success"
         assert "stats" in data
-        assert "breakdown" in data["stats"]  # Check new structure
+        assert "breakdown" in data["stats"]
 
 
 if __name__ == "__main__":

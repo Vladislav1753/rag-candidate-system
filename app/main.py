@@ -232,7 +232,9 @@ async def search_endpoint(request: Request, req: SearchRequest):
         filters["min_experience"] = req.min_experience
 
     # Try to get cached results
-    cached_results = await cache_service.get_cached_results(req.query, filters)
+    cached_results = await cache_service.get_cached_results(
+        req.query, filters, req.top_k
+    )
     if cached_results is not None:
         logger.info(f"Returning {len(cached_results)} cached results")
         return {"results": cached_results, "cached": True}

@@ -18,8 +18,7 @@ class CacheService:
         self.redis = redis_client
         self.ttl = int(os.getenv("CACHE_TTL", "86400"))  # Default: 24 hours
 
-    @staticmethod
-    def _generate_cache_key(query: Optional[str], filters: Dict[str, Any]) -> str:
+    def _generate_cache_key(self, query: Optional[str], filters: Dict[str, Any]) -> str:
         """Generate a unique cache key based on query and filters."""
         cache_data = {
             "query": query or "",
@@ -34,7 +33,7 @@ class CacheService:
         return f"expand:{hashlib.md5(normalized.encode()).hexdigest()}"
 
     async def get_cached_results(
-        self, query: Optional[str], filters: Dict[str, Any]
+        self, query: Optional[str], filters: Dict[str, Any], top_k: int
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Retrieve cached search results.
@@ -42,17 +41,26 @@ class CacheService:
         Args:
             query: Search query string
             filters: Search filters
+            top_k: Number of results requested
 
         Returns:
-            Cached results or None if not found
+            Sliced cached results or None if cache miss or insufficient results
         """
         try:
             cache_key = self._generate_cache_key(query, filters)
             cached_data = await self.redis.get(cache_key)
 
             if cached_data:
-                logger.info(f"Cache HIT for key: {cache_key}")
-                return json.loads(cached_data)
+                cached_list = json.loads(cached_data)
+                if len(cached_list) >= top_k:
+                    logger.info(
+                        f"Cache HIT for key: {cache_key} ({len(cached_list)} cached, returning {top_k})"
+                    )
+                    return cached_list[:top_k]
+                logger.info(
+                    f"Cache MISS (insufficient): {len(cached_list)} cached < {top_k} requested"
+                )
+                return None
 
             logger.info(f"Cache MISS for key: {cache_key}")
             return None
@@ -84,7 +92,7 @@ class CacheService:
         results: List[Dict[str, Any]],
     ) -> bool:
         """
-        Store search results in cache.
+        Store search results in cache. Never downgrades an existing larger result set.
 
         Args:
             query: Search query string
@@ -96,6 +104,16 @@ class CacheService:
         """
         try:
             cache_key = self._generate_cache_key(query, filters)
+
+            existing = await self.redis.get(cache_key)
+            if existing:
+                existing_list = json.loads(existing)
+                if len(existing_list) >= len(results):
+                    logger.info(
+                        f"Skipping cache write: existing {len(existing_list)} >= new {len(results)}"
+                    )
+                    return True
+
             serialized_results = json.dumps(results, ensure_ascii=False)
 
             await self.redis.setex(cache_key, self.ttl, serialized_results)

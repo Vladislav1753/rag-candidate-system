@@ -1,43 +1,44 @@
-from contextlib import asynccontextmanager
-from fastapi import (
-    FastAPI,
-    BackgroundTasks,
-    HTTPException,
-    File,
-    UploadFile,
-    Request,
-    Header,
-    Depends,
-)
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List, Literal
-import sys
 import logging
 import os
 import secrets
+import sys
+from contextlib import asynccontextmanager
+from typing import Any, Literal
+
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from slowapi.errors import RateLimitExceeded
 
-from app.services.onboarding import (
-    CandidateOnboardingService,
-    CandidateInput,
-    init_db_pool,
-)
-from app.services.pipeline import process_candidate_background
-from app.services.parser import extract_text_from_pdf
 from app.core.cache import CacheService, init_redis_pool
 from app.middleware.rate_limit import (
+    RATE_LIMIT_DEFAULT,
+    RATE_LIMIT_EXTRACT,
+    RATE_LIMIT_ONBOARDING,
+    RATE_LIMIT_SEARCH,
     limiter,
     rate_limit_exceeded_handler,
-    RATE_LIMIT_SEARCH,
-    RATE_LIMIT_ONBOARDING,
-    RATE_LIMIT_EXTRACT,
-    RATE_LIMIT_DEFAULT,
 )
-from rag.retriever import search_candidates
-from rag.reranker import RerankerService
-from rag.onboarding_graph import app_workflow
+from app.services.onboarding import (
+    CandidateInput,
+    CandidateOnboardingService,
+    init_db_pool,
+)
+from app.services.parser import extract_text_from_pdf
+from app.services.pipeline import process_candidate_background
 from rag.agents.query_expansion_agent import QueryExpansionAgent
+from rag.onboarding_graph import app_workflow
+from rag.reranker import RerankerService
+from rag.retriever import search_candidates
 
 logging.basicConfig(
     level=logging.INFO,
@@ -99,20 +100,24 @@ async def verify_admin(x_api_key: str = Header(..., alias="X-API-Key")):
     Verify admin API key for protected endpoints.
     Uses secrets.compare_digest to prevent timing attacks.
     """
+    if not ADMIN_API_KEY:
+        logger.error("ADMIN_API_KEY is not configured")
+        raise HTTPException(status_code=500, detail="Admin API key is not configured")
+
     if not secrets.compare_digest(x_api_key, ADMIN_API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return x_api_key
 
 
 class SearchRequest(BaseModel):
-    query: Optional[str] = None
-    location: Optional[str] = None
-    min_experience: Optional[int] = None
+    query: str | None = None
+    location: str | None = None
+    min_experience: int | None = None
     top_k: int = 5
 
 
 class InvalidateCacheRequest(BaseModel):
-    scopes: List[Literal["search", "expand"]] = ["search", "expand"]
+    scopes: list[Literal["search", "expand"]] = ["search", "expand"]
 
 
 @app.post("/extract")
@@ -225,7 +230,7 @@ async def search_endpoint(request: Request, req: SearchRequest):
     if not cache_service:
         raise HTTPException(status_code=500, detail="Cache service not initialized")
 
-    filters = {}
+    filters: dict[str, Any] = {}
     if req.location:
         filters["location"] = req.location
     if req.min_experience:

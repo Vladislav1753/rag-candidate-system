@@ -3,11 +3,11 @@ Evaluation metrics for the RAG system.
 Implements core metrics for assessing search quality.
 """
 
-from typing import List, Dict, Any
 import math
+from typing import Any
 
 
-def precision_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
+def precision_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
     """
     Precision@K: The proportion of relevant documents among the top-K results.
 
@@ -30,7 +30,7 @@ def precision_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
     return hits / k if k > 0 else 0.0
 
 
-def recall_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
+def recall_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
     """
     Recall@K: The proportion of relevant documents found out of all relevant documents.
 
@@ -53,7 +53,7 @@ def recall_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
     return hits / len(relevant_set)
 
 
-def mean_reciprocal_rank(results: List[Dict[str, Any]]) -> float:
+def mean_reciprocal_rank(results: list[dict[str, Any]]) -> float:
     """
     MRR (Mean Reciprocal Rank): The average inverse rank of the first relevant document.
 
@@ -82,7 +82,7 @@ def mean_reciprocal_rank(results: List[Dict[str, Any]]) -> float:
     return sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
 
 
-def ndcg_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
+def ndcg_at_k(retrieved: list[str], relevant: list[str], k: int) -> float:
     """
     NDCG@K (Normalized Discounted Cumulative Gain): Ranking quality metric.
 
@@ -115,7 +115,7 @@ def ndcg_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
     return dcg / idcg if idcg > 0 else 0.0
 
 
-def map_at_k(results: List[Dict[str, Any]], k: int) -> float:
+def map_at_k(results: list[dict[str, Any]], k: int) -> float:
     """
     MAP@K (Mean Average Precision): The mean average precision across all queries.
 
@@ -158,8 +158,8 @@ def map_at_k(results: List[Dict[str, Any]], k: int) -> float:
 
 
 def calculate_all_metrics(
-    retrieved: List[str], relevant: List[str], k: int = 5
-) -> Dict[str, float]:
+    retrieved: list[str], relevant: list[str], k: int = 5
+) -> dict[str, float]:
     """
     Calculates all metrics for a single query.
 

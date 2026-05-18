@@ -4,17 +4,18 @@ Creates queries based on real candidates from the database.
 """
 
 import asyncio
-import asyncpg
 import json
-from typing import List, Dict, Any
-from dotenv import load_dotenv
 import os
+from typing import Any
+
+import asyncpg
+from dotenv import load_dotenv
 
 load_dotenv()
 
 
 # pylint: disable=too-many-branches,too-many-statements
-async def generate_test_queries() -> List[Dict[str, Any]]:
+async def generate_test_queries() -> list[dict[str, Any]]:
     """
     Generates test queries based on real candidates.
 

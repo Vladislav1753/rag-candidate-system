@@ -1,5 +1,6 @@
 import logging
-from typing import List, Dict, Any
+from typing import Any
+
 from sentence_transformers import CrossEncoder
 
 logger = logging.getLogger("reranker")
@@ -19,7 +20,7 @@ class RerankerService:
             return ", ".join(data["manual_list"])
         return str(data) if data else ""
 
-    def _format_complex_list(self, data: List[Dict], fields: List[str]) -> str:
+    def _format_complex_list(self, data: list[dict], fields: list[str]) -> str:
         """
         Helper to extract specific fields from a list of dicts (e.g. Projects, Work History).
         Example: extracts 'name' and 'description' from projects.
@@ -36,8 +37,8 @@ class RerankerService:
         return "; ".join(items)
 
     def rank_candidates(
-        self, query: str, candidates: List[Dict[str, Any]], top_k: int = 5
-    ) -> List[Dict[str, Any]]:
+        self, query: str, candidates: list[dict[str, Any]], top_k: int = 5
+    ) -> list[dict[str, Any]]:
         if not candidates:
             return []
 

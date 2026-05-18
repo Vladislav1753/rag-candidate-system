@@ -4,12 +4,12 @@ Contains metrics, test query generation, and reporting tools.
 """
 
 from .metrics import (
-    precision_at_k,
-    recall_at_k,
+    calculate_all_metrics,
+    map_at_k,
     mean_reciprocal_rank,
     ndcg_at_k,
-    map_at_k,
-    calculate_all_metrics,
+    precision_at_k,
+    recall_at_k,
 )
 
 __all__ = [

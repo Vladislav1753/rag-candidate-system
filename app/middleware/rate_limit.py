@@ -2,13 +2,15 @@
 Rate limiting middleware using slowapi.
 Protects endpoints from abuse by limiting the number of requests per time window.
 """
+
+import logging
 import os
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-import logging
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 logger = logging.getLogger(__name__)
 

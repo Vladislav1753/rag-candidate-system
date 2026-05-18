@@ -1,10 +1,12 @@
 """
 Tests for Query Expansion feature.
 """
+
 # pylint: disable=wrong-import-position
-import pytest
 import os
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 # Set test environment variables before importing app
@@ -12,8 +14,8 @@ os.environ["REDIS_URL"] = "redis://localhost:6379"
 os.environ["ADMIN_API_KEY"] = "test-admin-key-123"
 os.environ["OPENAI_API_KEY"] = "test-key"
 
-from app.main import app  # noqa: E402
 from app.core.cache import CacheService, init_redis_pool  # noqa: E402
+from app.main import app  # noqa: E402
 from app.middleware.rate_limit import limiter  # noqa: E402
 from rag.agents.query_expansion_agent import QueryExpansionAgent  # noqa: E402
 
@@ -127,9 +129,10 @@ async def test_expansion_endpoint_success():
     client = TestClient(app)
 
     # Patch services to return success
-    with patch("app.main.query_expander") as mock_expander, patch(
-        "app.main.cache_service"
-    ) as mock_cache:
+    with (
+        patch("app.main.query_expander") as mock_expander,
+        patch("app.main.cache_service") as mock_cache,
+    ):
         mock_cache.get_expanded_query = AsyncMock(return_value=None)
         mock_cache.set_expanded_query = AsyncMock(return_value=True)
         mock_expander.expand_query.return_value = (
@@ -171,9 +174,10 @@ async def test_expansion_endpoint_with_cache():
     """Test that expansion endpoint uses cache."""
     client = TestClient(app)
 
-    with patch("app.main.cache_service") as mock_cache, patch(
-        "app.main.query_expander"
-    ) as mock_expander:
+    with (
+        patch("app.main.cache_service") as mock_cache,
+        patch("app.main.query_expander") as mock_expander,
+    ):
         # --- Case 1: Cache Miss ---
         mock_cache.get_expanded_query = AsyncMock(return_value=None)
         mock_cache.set_expanded_query = AsyncMock(return_value=True)
@@ -202,9 +206,10 @@ async def test_expansion_endpoint_with_filters():
     """Test that expansion endpoint accepts SearchRequest with filters."""
     client = TestClient(app)
 
-    with patch("app.main.query_expander") as mock_expander, patch(
-        "app.main.cache_service"
-    ) as mock_cache:
+    with (
+        patch("app.main.query_expander") as mock_expander,
+        patch("app.main.cache_service") as mock_cache,
+    ):
         mock_cache.get_expanded_query = AsyncMock(return_value=None)
         mock_cache.set_expanded_query = AsyncMock(return_value=True)
         mock_expander.expand_query.return_value = (
@@ -253,9 +258,10 @@ async def test_expansion_rate_limiting():
     client = TestClient(app)
 
     # Mock services to avoid 500 errors inside the loop
-    with patch("app.main.query_expander") as mock_expander, patch(
-        "app.main.cache_service"
-    ) as mock_cache:
+    with (
+        patch("app.main.query_expander") as mock_expander,
+        patch("app.main.cache_service") as mock_cache,
+    ):
         mock_cache.get_expanded_query = AsyncMock(return_value=None)
         mock_cache.set_expanded_query = AsyncMock(return_value=True)
         mock_expander.expand_query.return_value = "Expanded"

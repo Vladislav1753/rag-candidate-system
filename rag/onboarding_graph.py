@@ -1,11 +1,11 @@
-from typing import TypedDict, List
-from dotenv import load_dotenv
+from typing import TypedDict
 
-from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
-from typing import Optional
-from langgraph.graph import StateGraph, END
+
 from rag.agents.summary_agent import SummaryAgent
 
 load_dotenv()
@@ -13,38 +13,38 @@ load_dotenv()
 
 class ExtractedResumeData(BaseModel):
     full_name: str = Field(description="Full name of the candidate")
-    email: Optional[str] = Field(None, description="Email address")
-    phone: Optional[str] = Field(None, description="Phone number")
-    location: Optional[str] = Field(None, description="City and Country")
-    professional_title: Optional[str] = Field(
+    email: str | None = Field(None, description="Email address")
+    phone: str | None = Field(None, description="Phone number")
+    location: str | None = Field(None, description="City and Country")
+    professional_title: str | None = Field(
         None, description="Current professional title or role"
     )
-    years_experience: Optional[int] = Field(
+    years_experience: int | None = Field(
         None, description="Total years of experience (integer)"
     )
-    spoken_languages: List[str] = Field(
+    spoken_languages: list[str] = Field(
         default_factory=list, description="List of spoken languages"
     )
 
-    skills: List[str] = Field(
+    skills: list[str] = Field(
         default_factory=list, description="List of technical and soft skills"
     )
-    tools_technologies: List[str] = Field(
+    tools_technologies: list[str] = Field(
         default_factory=list,
         description="List of specific tools, libraries, frameworks",
     )
-    projects: List[str] = Field(
+    projects: list[str] = Field(
         default_factory=list,
         description="List of key project names or brief descriptions",
     )
-    work_history: List[str] = Field(
+    work_history: list[str] = Field(
         default_factory=list, description="List of past job titles and companies"
     )
 
-    education: Optional[str] = Field(
+    education: str | None = Field(
         None, description="Summary of education (Degrees, Universities)"
     )
-    certifications: List[str] = Field(
+    certifications: list[str] = Field(
         default_factory=list, description="List of certifications or licenses"
     )
 

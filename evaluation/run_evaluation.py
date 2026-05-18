@@ -3,13 +3,14 @@ Main evaluation script for comparing RAG with and without a reranker.
 """
 
 import asyncio
-import asyncpg
 import json
 import os
-from typing import List, Dict, Any
-from dotenv import load_dotenv
 import sys
 from pathlib import Path
+from typing import Any
+
+import asyncpg
+from dotenv import load_dotenv
 
 # Add project root to PATH
 project_root = Path(__file__).parent.parent
@@ -17,14 +18,14 @@ sys.path.insert(0, str(project_root))
 
 # pylint: disable=wrong-import-position
 from evaluation.metrics import (
-    precision_at_k,
-    recall_at_k,
+    map_at_k,
     mean_reciprocal_rank,
     ndcg_at_k,
-    map_at_k,
+    precision_at_k,
+    recall_at_k,
 )
-from rag.retriever import search_candidates
 from rag.reranker import RerankerService
+from rag.retriever import search_candidates
 
 # pylint: enable=wrong-import-position
 
@@ -50,8 +51,8 @@ async def init_db_pool():
 
 
 async def run_search_without_reranker(
-    query: str, filters: Dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
-) -> List[Dict[str, Any]]:
+    query: str, filters: dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
+) -> list[dict[str, Any]]:
     """Search WITHOUT reranker (vector search only)."""
     candidates = await search_candidates(
         query=query, filters=filters, db_pool=db_pool, top_k=top_k
@@ -61,11 +62,11 @@ async def run_search_without_reranker(
 
 async def run_search_with_reranker(
     query: str,
-    filters: Dict[str, Any],
+    filters: dict[str, Any],
     db_pool: asyncpg.Pool,
     reranker: RerankerService,
     top_k: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search WITH reranker (vector search + reranking)."""
     # Fetch more candidates for reranking
     candidates = await search_candidates(
@@ -82,8 +83,8 @@ async def run_search_with_reranker(
 
 
 def calculate_aggregate_metrics(
-    results: List[Dict[str, Any]], k_values: List[int]
-) -> Dict[str, float]:
+    results: list[dict[str, Any]], k_values: list[int]
+) -> dict[str, float]:
     """Calculates averaged metrics for a list of results."""
     metrics = {}
     for k in k_values:
@@ -117,7 +118,7 @@ async def evaluate_rag_system(test_queries_file: str = "evaluation/test_queries.
 
     # Load test queries
     print(f"📖 Loading test queries from {test_queries_file}...")
-    with open(test_queries_file, "r", encoding="utf-8") as f:
+    with open(test_queries_file, encoding="utf-8") as f:
         test_queries = json.load(f)
 
     print(f"✅ Loaded {len(test_queries)} test queries\n")

@@ -1,33 +1,33 @@
-import uuid
-import logging
 import json
-from datetime import datetime
-from typing import List, Optional, Dict, Any
+import logging
 import os
+import uuid
+from datetime import datetime
+from typing import Any
 
 import asyncpg
-from pydantic import BaseModel, Field, EmailStr
 from dotenv import load_dotenv
+from pydantic import BaseModel, EmailStr, Field
 
 load_dotenv()
 
 
 class CandidateInput(BaseModel):
     full_name: str = Field(..., min_length=2)
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    location: Optional[str] = None
-    spoken_languages: Optional[List[str]] = None
-    professional_title: Optional[str] = None
-    years_experience: Optional[int] = None
+    email: EmailStr | None = None
+    phone: str | None = None
+    location: str | None = None
+    spoken_languages: list[str] | None = None
+    professional_title: str | None = None
+    years_experience: int | None = None
 
-    skills: Optional[Dict[str, Any]] = None
-    tools_technologies: Optional[Dict[str, Any]] = None
-    projects: Optional[Dict[str, Any]] = None
-    work_history: Optional[Dict[str, Any]] = None
+    skills: dict[str, Any] | None = None
+    tools_technologies: dict[str, Any] | None = None
+    projects: dict[str, Any] | None = None
+    work_history: dict[str, Any] | None = None
 
-    education: Optional[str] = None
-    certifications: Optional[str] = None
+    education: str | None = None
+    certifications: str | None = None
 
 
 class CandidateOnboardingService:

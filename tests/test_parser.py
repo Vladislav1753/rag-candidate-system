@@ -1,5 +1,6 @@
-from unittest.mock import MagicMock, patch
 import io
+from unittest.mock import MagicMock, patch
+
 from app.services.parser import extract_text_from_pdf
 
 

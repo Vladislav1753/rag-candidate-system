@@ -3,10 +3,12 @@ Tests for Redis cache service and protected cache endpoints.
 """
 
 # pylint: disable=wrong-import-position
-import pytest
 import os
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
+
 from app.core.cache import CacheService, init_redis_pool
 from app.middleware.rate_limit import limiter
 

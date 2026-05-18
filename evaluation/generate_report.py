@@ -11,7 +11,7 @@ def generate_html_report(
 ):
     """Creates an HTML report with metric visualization."""
 
-    with open(report_json_path, "r", encoding="utf-8") as f:
+    with open(report_json_path, encoding="utf-8") as f:
         report = json.load(f)
 
     metrics_no_rerank = report["metrics_without_reranker"]
@@ -180,30 +180,30 @@ def generate_html_report(
         <div class="metrics-grid">
             <div class="metric-card">
                 <h3>MRR (Mean Reciprocal Rank)</h3>
-                <div class="metric-value">{metrics_with_rerank['mrr']:.4f}</div>
+                <div class="metric-value">{metrics_with_rerank["mrr"]:.4f}</div>
                 <div class="metric-improvement">
-                    <span class="{'improvement-positive' if improvements['mrr'] > 0 else 'improvement-negative'}">
-                        {'+' if improvements['mrr'] > 0 else ''}{improvements['mrr']:.2f}% with Reranker
+                    <span class="{"improvement-positive" if improvements["mrr"] > 0 else "improvement-negative"}">
+                        {"+" if improvements["mrr"] > 0 else ""}{improvements["mrr"]:.2f}% with Reranker
                     </span>
                 </div>
             </div>
 
             <div class="metric-card">
                 <h3>MAP@5 (Mean Average Precision)</h3>
-                <div class="metric-value">{metrics_with_rerank['map@5']:.4f}</div>
+                <div class="metric-value">{metrics_with_rerank["map@5"]:.4f}</div>
                 <div class="metric-improvement">
-                    <span class="{'improvement-positive' if improvements['map@5'] > 0 else 'improvement-negative'}">
-                        {'+' if improvements['map@5'] > 0 else ''}{improvements['map@5']:.2f}% with Reranker
+                    <span class="{"improvement-positive" if improvements["map@5"] > 0 else "improvement-negative"}">
+                        {"+" if improvements["map@5"] > 0 else ""}{improvements["map@5"]:.2f}% with Reranker
                     </span>
                 </div>
             </div>
 
             <div class="metric-card">
                 <h3>NDCG@5</h3>
-                <div class="metric-value">{metrics_with_rerank['ndcg@5']:.4f}</div>
+                <div class="metric-value">{metrics_with_rerank["ndcg@5"]:.4f}</div>
                 <div class="metric-improvement">
-                    <span class="{'improvement-positive' if improvements['ndcg@5'] > 0 else 'improvement-negative'}">
-                        {'+' if improvements['ndcg@5'] > 0 else ''}{improvements['ndcg@5']:.2f}% with Reranker
+                    <span class="{"improvement-positive" if improvements["ndcg@5"] > 0 else "improvement-negative"}">
+                        {"+" if improvements["ndcg@5"] > 0 else ""}{improvements["ndcg@5"]:.2f}% with Reranker
                     </span>
                 </div>
             </div>
@@ -248,7 +248,7 @@ def generate_html_report(
                     <td>{no_rerank_val:.4f}</td>
                     <td>{with_rerank_val:.4f}</td>
                     <td style="color: {improvement_color}; font-weight: bold;">
-                        {'+' if improvement > 0 else ''}{improvement:.2f}%
+                        {"+" if improvement > 0 else ""}{improvement:.2f}%
                     </td>
                 </tr>
 """

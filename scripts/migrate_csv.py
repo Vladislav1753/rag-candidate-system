@@ -1,9 +1,11 @@
 import asyncio
-import os
 import json
+import os
 import uuid
 from datetime import datetime
+
 import pandas as pd
+
 from app.services.onboarding import init_db_pool
 from rag.embedding.embedder import Embedder
 

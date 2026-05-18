@@ -1,8 +1,10 @@
 """
 Test script to verify rate limiting with Redis.
 """
-import requests
+
 import time
+
+import requests
 
 API_URL = "http://localhost:8000"
 
@@ -15,9 +17,9 @@ def test_rate_limiting(endpoint: str = "/search", max_requests: int = 25) -> Non
         endpoint: API endpoint to test
         max_requests: Number of requests to send
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing Rate Limiting on {endpoint}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     success_count = 0
     rate_limited_count = 0
@@ -30,12 +32,12 @@ def test_rate_limiting(endpoint: str = "/search", max_requests: int = 25) -> Non
 
             if response.status_code == 200:
                 success_count += 1
-                print(f"✅ Request {i+1:2d}: Success (200 OK)")
+                print(f"✅ Request {i + 1:2d}: Success (200 OK)")
             elif response.status_code == 429:
                 rate_limited_count += 1
                 retry_after = response.headers.get("Retry-After", "N/A")
                 print(
-                    f"🚫 Request {i+1:2d}: Rate Limited (429) - Retry after {retry_after}s"
+                    f"🚫 Request {i + 1:2d}: Rate Limited (429) - Retry after {retry_after}s"
                 )
 
                 # Show response body
@@ -45,29 +47,29 @@ def test_rate_limiting(endpoint: str = "/search", max_requests: int = 25) -> Non
                 except ValueError:
                     pass
             else:
-                print(f"❌ Request {i+1:2d}: Error {response.status_code}")
+                print(f"❌ Request {i + 1:2d}: Error {response.status_code}")
 
         except Exception as e:
-            print(f"❌ Request {i+1:2d}: Exception - {e}")
+            print(f"❌ Request {i + 1:2d}: Exception - {e}")
 
         # Small delay between requests
         time.sleep(0.1)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Results:")
     print(f"  ✅ Successful requests: {success_count}")
     print(f"  🚫 Rate limited requests: {rate_limited_count}")
     print(f"  📊 Total requests: {max_requests}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 def test_with_api_key(api_key: str = "test_user_123") -> None:
     """
     Test rate limiting with API key.
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing Rate Limiting with API Key: {api_key}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     headers = {"X-API-Key": api_key}
 
@@ -80,10 +82,10 @@ def test_with_api_key(api_key: str = "test_user_123") -> None:
                 timeout=5,
             )
 
-            print(f"Request {i+1}: Status {response.status_code}")
+            print(f"Request {i + 1}: Status {response.status_code}")
 
         except Exception as e:
-            print(f"Request {i+1}: Exception - {e}")
+            print(f"Request {i + 1}: Exception - {e}")
 
         time.sleep(0.1)
 

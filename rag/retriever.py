@@ -1,8 +1,10 @@
-import logging
-import asyncpg
-from typing import Optional, Dict, Any
-from rag.embedding.embedder import Embedder
 import json
+import logging
+from typing import Any
+
+import asyncpg
+
+from rag.embedding.embedder import Embedder
 
 logger = logging.getLogger("retriever")
 embedder = Embedder()
@@ -25,8 +27,8 @@ def _parse_json_field(field_data: Any, default_val: Any) -> Any:
 
 
 async def search_candidates(
-    query: Optional[str], filters: Dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
-) -> list[Dict[str, Any]]:
+    query: str | None, filters: dict[str, Any], db_pool: asyncpg.Pool, top_k: int = 5
+) -> list[dict[str, Any]]:
     """
     Performs a hybrid search in PostgreSQL:
     - If `query` is provided -> Semantic Search (Vector).

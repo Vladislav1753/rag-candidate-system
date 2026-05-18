@@ -1,4 +1,5 @@
 import logging
+
 from app.services.onboarding import CandidateInput
 from rag.agents.summary_agent import SummaryAgent
 from rag.embedding.embedder import Embedder

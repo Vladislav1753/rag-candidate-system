@@ -1,12 +1,14 @@
 """
 Redis cache service for search results.
 """
+
+import hashlib
 import json
 import logging
-from typing import Optional, Dict, Any, List
-import redis.asyncio as redis
 import os
-import hashlib
+from typing import Any
+
+import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ class CacheService:
         self.redis = redis_client
         self.ttl = int(os.getenv("CACHE_TTL", "86400"))  # Default: 24 hours
 
-    def _generate_cache_key(self, query: Optional[str], filters: Dict[str, Any]) -> str:
+    def _generate_cache_key(self, query: str | None, filters: dict[str, Any]) -> str:
         """Generate a unique cache key based on query and filters."""
         cache_data = {
             "query": query or "",
@@ -33,8 +35,8 @@ class CacheService:
         return f"expand:{hashlib.md5(normalized.encode()).hexdigest()}"
 
     async def get_cached_results(
-        self, query: Optional[str], filters: Dict[str, Any], top_k: int
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, query: str | None, filters: dict[str, Any], top_k: int
+    ) -> list[dict[str, Any]] | None:
         """
         Retrieve cached search results.
 
@@ -69,7 +71,7 @@ class CacheService:
             logger.error(f"Cache retrieval error: {e}")
             return None
 
-    async def get_expanded_query(self, query: str) -> Optional[str]:
+    async def get_expanded_query(self, query: str) -> str | None:
         """Get cached expanded query string.
 
         Args:
@@ -87,9 +89,9 @@ class CacheService:
 
     async def set_cached_results(
         self,
-        query: Optional[str],
-        filters: Dict[str, Any],
-        results: List[Dict[str, Any]],
+        query: str | None,
+        filters: dict[str, Any],
+        results: list[dict[str, Any]],
     ) -> bool:
         """
         Store search results in cache. Never downgrades an existing larger result set.
@@ -194,7 +196,7 @@ class CacheService:
                 break
         return count
 
-    async def get_cache_stats(self) -> Dict[str, Any]:
+    async def get_cache_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
 

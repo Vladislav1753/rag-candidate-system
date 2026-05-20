@@ -2,35 +2,11 @@
 Tests for Redis cache service and protected cache endpoints.
 """
 
-# pylint: disable=wrong-import-position
-import os
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.core.cache import CacheService, init_redis_pool
-from app.middleware.rate_limit import limiter
-
-# Set test environment variables before importing app
-os.environ["REDIS_URL"] = "redis://localhost:6379"
-os.environ["ADMIN_API_KEY"] = "test-admin-key-123"
-
-from app.main import app  # noqa: E402
-
-
-@pytest.fixture(autouse=True)
-def disable_rate_limiting():
-    """Disable rate limiting globally to prevent 429 errors."""
-    limiter.enabled = False
-    yield
-    limiter.enabled = True
-
-
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
 
 
 @pytest.mark.asyncio

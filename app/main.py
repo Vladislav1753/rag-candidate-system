@@ -1,5 +1,4 @@
 import logging
-import os
 import secrets
 import sys
 from contextlib import asynccontextmanager
@@ -20,6 +19,7 @@ from pydantic import BaseModel
 from slowapi.errors import RateLimitExceeded
 
 from app.core.cache import CacheService, init_redis_pool
+from app.core.config import settings
 from app.middleware.rate_limit import (
     RATE_LIMIT_DEFAULT,
     RATE_LIMIT_EXTRACT,
@@ -52,7 +52,6 @@ reranker = None
 redis_client = None
 cache_service = None
 query_expander = None
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 
 
 @asynccontextmanager
@@ -100,11 +99,11 @@ async def verify_admin(x_api_key: str = Header(..., alias="X-API-Key")):
     Verify admin API key for protected endpoints.
     Uses secrets.compare_digest to prevent timing attacks.
     """
-    if not ADMIN_API_KEY:
+    if not settings.app.admin_api_key:
         logger.error("ADMIN_API_KEY is not configured")
         raise HTTPException(status_code=500, detail="Admin API key is not configured")
 
-    if not secrets.compare_digest(x_api_key, ADMIN_API_KEY):
+    if not secrets.compare_digest(x_api_key, settings.app.admin_api_key):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return x_api_key
 

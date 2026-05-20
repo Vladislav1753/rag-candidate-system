@@ -1,10 +1,7 @@
-import os
-
-from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-load_dotenv()
+from app.core.config import settings
 
 
 class SummaryAgent:
@@ -16,7 +13,7 @@ class SummaryAgent:
 
     def __init__(self, model_name="gpt-4o-mini"):
         self.llm = ChatOpenAI(
-            model=model_name, temperature=0.2, api_key=os.getenv("OPENAI_API_KEY")
+            model=model_name, temperature=0.2, api_key=settings.app.openai_api_key
         )
 
     def generate_summary(self, input_data: str | dict) -> str:

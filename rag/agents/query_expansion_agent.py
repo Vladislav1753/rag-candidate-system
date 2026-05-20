@@ -3,13 +3,10 @@ Query Expansion Agent for improving search queries.
 Transforms simple queries into detailed, comprehensive search terms.
 """
 
-import os
-
-from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-load_dotenv()
+from app.core.config import settings
 
 
 class QueryExpansionAgent:
@@ -21,7 +18,7 @@ class QueryExpansionAgent:
 
     def __init__(self, model_name="gpt-4o-mini"):
         self.llm = ChatOpenAI(
-            model=model_name, temperature=0.0, api_key=os.getenv("OPENAI_API_KEY")
+            model=model_name, temperature=0.0, api_key=settings.app.openai_api_key
         )
 
     def expand_query(self, original_query: str) -> str:

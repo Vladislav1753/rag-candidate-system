@@ -1,15 +1,13 @@
 import json
 import logging
-import os
 import uuid
 from datetime import datetime
 from typing import Any
 
 import asyncpg
-from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr, Field
 
-load_dotenv()
+from app.core.config import settings
 
 
 class CandidateInput(BaseModel):
@@ -95,21 +93,16 @@ class CandidateOnboardingService:
 
 
 async def init_db_pool() -> asyncpg.pool.Pool:
-    db_user = os.getenv("DB_USER", "postgres")
-    db_pass = os.getenv("DB_PASSWORD", "postgres")
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = int(os.getenv("DB_PORT", 5433))
-
     print(
-        f"DEBUG CONNECTION: Host={db_host}, Port={db_port}, User={db_user}, Pass={db_pass}"
+        f"DEBUG CONNECTION: Host={settings.postgres.host}, Port={settings.postgres.port}, User={settings.postgres.user}, Pass={settings.postgres.password}"
     )
 
     return await asyncpg.create_pool(
-        user=db_user,
-        password=db_pass,
-        database=os.getenv("DB_NAME", "candidates"),
-        host=db_host,
-        port=db_port,
+        user=settings.postgres.user,
+        password=settings.postgres.password,
+        database=settings.postgres.name,
+        host=settings.postgres.host,
+        port=settings.postgres.port,
         min_size=1,
         max_size=5,
     )

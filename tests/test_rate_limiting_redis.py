@@ -6,7 +6,7 @@ import time
 
 import requests
 
-API_URL = "http://localhost:8000"
+from app.core.config import settings
 
 
 def test_rate_limiting(endpoint: str = "/search", max_requests: int = 25) -> None:
@@ -27,7 +27,9 @@ def test_rate_limiting(endpoint: str = "/search", max_requests: int = 25) -> Non
     for i in range(max_requests):
         try:
             response = requests.post(
-                f"{API_URL}{endpoint}", json={"query": "Python developer"}, timeout=5
+                f"{settings.app.api_url}{endpoint}",
+                json={"query": "Python developer"},
+                timeout=5,
             )
 
             if response.status_code == 200:
@@ -76,7 +78,7 @@ def test_with_api_key(api_key: str = "test_user_123") -> None:
     for i in range(5):
         try:
             response = requests.post(
-                f"{API_URL}/search",
+                f"{settings.app.api_url}/search",
                 json={"query": "Python developer"},
                 headers=headers,
                 timeout=5,

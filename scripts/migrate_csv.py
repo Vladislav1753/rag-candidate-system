@@ -63,7 +63,11 @@ async def migrate():
 
             raw_langs = row.get("spoken_languages", "")
             if isinstance(raw_langs, str) and raw_langs.strip():
-                langs_list = [l.strip() for l in raw_langs.split(",") if l.strip()]
+                langs_list = [
+                    language.strip()
+                    for language in raw_langs.split(",")
+                    if language.strip()
+                ]
             else:
                 langs_list = []
 

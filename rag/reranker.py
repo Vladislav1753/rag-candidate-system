@@ -90,7 +90,7 @@ class RerankerService:
         scores = self.model.predict(pairs)
 
         scored_candidates = []
-        for cand, score in zip(candidates, scores):
+        for cand, score in zip(candidates, scores, strict=False):
             cand["rerank_score"] = float(score)
             scored_candidates.append(cand)
 

@@ -5,10 +5,11 @@ Redis cache service for search results.
 import hashlib
 import json
 import logging
-import os
 from typing import Any
 
 import redis.asyncio as redis
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class CacheService:
 
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
-        self.ttl = int(os.getenv("CACHE_TTL", "86400"))  # Default: 24 hours
+        self.ttl = settings.redis.cache_ttl
 
     def _generate_cache_key(self, query: str | None, filters: dict[str, Any]) -> str:
         """Generate a unique cache key based on query and filters."""
@@ -235,7 +236,7 @@ class CacheService:
 
 async def init_redis_pool() -> redis.Redis:
     """Initialize Redis connection pool."""
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    redis_url = settings.redis.url
 
     try:
         redis_client = redis.from_url(

@@ -10,41 +10,34 @@ from pathlib import Path
 from typing import Any
 
 import asyncpg
-from dotenv import load_dotenv
 
 # Add project root to PATH
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # pylint: disable=wrong-import-position
-from evaluation.metrics import (
+from app.core.config import settings  # noqa: E402
+from evaluation.metrics import (  # noqa: E402
     map_at_k,
     mean_reciprocal_rank,
     ndcg_at_k,
     precision_at_k,
     recall_at_k,
-)
-from rag.reranker import RerankerService
-from rag.retriever import search_candidates
+)  # noqa: E402
+from rag.reranker import RerankerService  # noqa: E402
+from rag.retriever import search_candidates  # noqa: E402
 
 # pylint: enable=wrong-import-position
-
-load_dotenv()
 
 
 async def init_db_pool():
     """Initializes the database connection pool."""
-    db_user = os.getenv("DB_USER", "admin")
-    db_password = os.getenv("DB_PASSWORD", "admin")
-    db_name = os.getenv("DB_NAME", "candidates")
-    db_port = os.getenv("DB_PORT", "5433")
-
     return await asyncpg.create_pool(
-        user=db_user,
-        password=db_password,
-        database=db_name,
-        host="localhost",
-        port=db_port,
+        user=settings.postgres.user,
+        password=settings.postgres.password,
+        database=settings.postgres.name,
+        host=settings.postgres.host,
+        port=settings.postgres.port,
         min_size=1,
         max_size=5,
     )

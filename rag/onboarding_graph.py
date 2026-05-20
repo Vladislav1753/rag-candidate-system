@@ -1,14 +1,12 @@
 from typing import TypedDict
 
-from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
 from rag.agents.summary_agent import SummaryAgent
-
-load_dotenv()
 
 
 class ExtractedResumeData(BaseModel):
@@ -55,7 +53,7 @@ class OnboardingState(TypedDict):
     final_summary: str
 
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+llm = ChatOpenAI(model="gpt-4o", temperature=0, api_key=settings.app.openai_api_key)
 summary_agent = SummaryAgent()
 
 

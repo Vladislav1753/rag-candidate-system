@@ -9,9 +9,8 @@ import os
 from typing import Any
 
 import asyncpg
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import settings
 
 
 # pylint: disable=too-many-branches,too-many-statements
@@ -25,17 +24,12 @@ async def generate_test_queries() -> list[dict[str, Any]]:
     - description: query description
     """
 
-    db_user = os.getenv("DB_USER", "admin")
-    db_password = os.getenv("DB_PASSWORD", "admin")
-    db_name = os.getenv("DB_NAME", "candidates")
-    db_port = os.getenv("DB_PORT", "5433")
-
     db_pool = await asyncpg.create_pool(
-        user=db_user,
-        password=db_password,
-        database=db_name,
-        host="localhost",
-        port=db_port,
+        user=settings.postgres.user,
+        password=settings.postgres.password,
+        database=settings.postgres.name,
+        host=settings.postgres.host,
+        port=settings.postgres.port,
         min_size=1,
         max_size=5,
     )

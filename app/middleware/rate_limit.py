@@ -4,7 +4,6 @@ Protects endpoints from abuse by limiting the number of requests per time window
 """
 
 import logging
-import os
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -12,18 +11,18 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Rate limit configuration from environment variables
-RATE_LIMIT_SEARCH = os.getenv("RATE_LIMIT_SEARCH", "20/hour")
-RATE_LIMIT_ONBOARDING = os.getenv("RATE_LIMIT_ONBOARDING", "20/hour")
-RATE_LIMIT_EXTRACT = os.getenv("RATE_LIMIT_EXTRACT", "20/hour")
-RATE_LIMIT_DEFAULT = os.getenv("RATE_LIMIT_DEFAULT", "20/hour")
+RATE_LIMIT_SEARCH = settings.rate_limit.search
+RATE_LIMIT_ONBOARDING = settings.rate_limit.onboarding
+RATE_LIMIT_EXTRACT = settings.rate_limit.extract
+RATE_LIMIT_DEFAULT = settings.rate_limit.default
 
 # Redis configuration (optional, falls back to in-memory storage)
-REDIS_URL = os.getenv(
-    "REDIS_URL"
-)  # e.g., "redis://localhost:6379" or "redis://redis:6379"
+REDIS_URL = settings.redis.url
 
 
 def get_identifier(request: Request) -> str:

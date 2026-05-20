@@ -1,13 +1,9 @@
-import os
-
 import requests
 import streamlit as st
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import settings
 
-
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_URL = settings.app.api_url
 
 
 st.set_page_config(page_title="RAG Recruiter AI", page_icon="🤖", layout="wide")
@@ -198,7 +194,7 @@ with tab2:
 
     uploaded_file = st.file_uploader("📄 Upload PDF Resume", type="pdf")
 
-    if uploaded_file is not None:
+    if uploaded_file is not None:  # noqa: SIM102
         if st.button("✨ Extract All Data with AI"):
             with st.spinner("Analyzing PDF... Parsing complex fields..."):
                 try:

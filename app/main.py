@@ -1,9 +1,11 @@
+import asyncio
 import logging
 import secrets
 import sys
-from contextlib import asynccontextmanager
-from typing import Any, Literal
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Annotated, Any, Literal
 
+import asyncpg
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -18,6 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi.errors import RateLimitExceeded
 
+from app.api.dependencies import (
+    get_cache_service,
+    get_db_pool,
+    get_query_expander,
+    get_reranker,
+)
 from app.core.cache import CacheService, init_redis_pool
 from app.core.config import settings
 from app.middleware.rate_limit import (
@@ -47,36 +55,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
-db_pool = None
-reranker = None
-redis_client = None
-cache_service = None
-query_expander = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_pool, reranker, redis_client, cache_service, query_expander
-    logger.info("Connecting to Database...")
-    db_pool = await init_db_pool()
+    async with AsyncExitStack() as stack:
+        logger.info("Connecting to Database...")
+        app.state.db_pool = await init_db_pool()
+        stack.push_async_callback(app.state.db_pool.close)
 
-    logger.info("Connecting to Redis...")
-    redis_client = await init_redis_pool()
-    cache_service = CacheService(redis_client)
+        logger.info("Connecting to Redis...")
+        app.state.redis_client = await init_redis_pool()
+        stack.push_async_callback(app.state.redis_client.close)
 
-    logger.info("Loading Reranker model (CrossEncoder)...")
-    reranker = RerankerService()
+        app.state.cache_service = CacheService(app.state.redis_client)
 
-    logger.info("Initializing Query Expansion Agent...")
-    query_expander = QueryExpansionAgent()
+        logger.info("Loading Reranker model (CrossEncoder)...")
+        app.state.reranker = await asyncio.to_thread(RerankerService)
 
-    yield
-    if db_pool:
-        logger.info("Closing Database connection...")
-        await db_pool.close()
-    if redis_client:
-        logger.info("Closing Redis connection...")
-        await redis_client.close()
+        logger.info("Initializing Query Expansion Agent...")
+        app.state.query_expander = QueryExpansionAgent()
+
+        yield
 
 
 app = FastAPI(lifespan=lifespan)
@@ -149,11 +148,11 @@ async def extract_from_pdf(request: Request, file: UploadFile = File(...)):
 @app.post("/onboarding")
 @limiter.limit(RATE_LIMIT_ONBOARDING)
 async def onboard_candidate(
-    request: Request, data: CandidateInput, background_tasks: BackgroundTasks
+    request: Request,
+    db_pool: Annotated[asyncpg.pool.Pool, Depends(get_db_pool)],
+    data: CandidateInput,
+    background_tasks: BackgroundTasks,
 ):
-    if not db_pool:
-        raise HTTPException(status_code=500, detail="Database not initialized")
-
     service = CandidateOnboardingService(db_pool)
     result = await service.create_candidate(data)
 
@@ -169,18 +168,18 @@ async def onboard_candidate(
 
 @app.post("/expand-query")
 @limiter.limit(RATE_LIMIT_DEFAULT)
-async def expand_query_endpoint(request: Request, req: SearchRequest):
+async def expand_query_endpoint(
+    request: Request,
+    query_expander: Annotated[QueryExpansionAgent, Depends(get_query_expander)],
+    cache_service: Annotated[CacheService, Depends(get_cache_service)],
+    req: SearchRequest,
+):
     """
     Expand a simple search query into a more detailed and comprehensive version.
     Example: 'python lead' -> 'Senior Python Developer, Team Lead, Django, Flask, Architecture'
 
     The expanded query is returned and can be used to update the SearchRequest.query field.
     """
-    if not query_expander:
-        raise HTTPException(status_code=500, detail="Query expander not initialized")
-
-    if not cache_service:
-        raise HTTPException(status_code=500, detail="Cache service not initialized")
 
     if not req.query or len(req.query.strip()) < 2:
         raise HTTPException(
@@ -219,16 +218,13 @@ async def expand_query_endpoint(request: Request, req: SearchRequest):
 
 @app.post("/search")
 @limiter.limit(RATE_LIMIT_SEARCH)
-async def search_endpoint(request: Request, req: SearchRequest):
-    if not db_pool:
-        raise HTTPException(status_code=500, detail="Database not initialized")
-
-    if not reranker:
-        raise HTTPException(status_code=500, detail="Reranker not initialized")
-
-    if not cache_service:
-        raise HTTPException(status_code=500, detail="Cache service not initialized")
-
+async def search_endpoint(
+    request: Request,
+    reranker: Annotated[RerankerService, Depends(get_reranker)],
+    db_pool: Annotated[asyncpg.pool.Pool, Depends(get_db_pool)],
+    cache_service: Annotated[CacheService, Depends(get_cache_service)],
+    req: SearchRequest,
+):
     filters: dict[str, Any] = {}
     if req.location:
         filters["location"] = req.location
@@ -274,16 +270,16 @@ async def search_endpoint(request: Request, req: SearchRequest):
 
 
 @app.post("/cache/invalidate", dependencies=[Depends(verify_admin)])
-async def invalidate_cache(req: InvalidateCacheRequest = InvalidateCacheRequest()):
+async def invalidate_cache(
+    cache_service: Annotated[CacheService, Depends(get_cache_service)],
+    req: InvalidateCacheRequest = InvalidateCacheRequest(),
+):
     """
     Invalidate cache.
     By default, invalidates ALL caches.
     To invalidate specific parts, pass a JSON body: {"scopes": ["search"]}
     Requires admin API key.
     """
-
-    if not cache_service:
-        raise HTTPException(status_code=500, detail="Cache service not initialized")
 
     results = {"search": 0, "expanded_queries": 0, "total": 0}
 
@@ -301,11 +297,10 @@ async def invalidate_cache(req: InvalidateCacheRequest = InvalidateCacheRequest(
 
 
 @app.get("/cache/stats", dependencies=[Depends(verify_admin)])
-async def get_cache_stats():
+async def get_cache_stats(
+    cache_service: Annotated[CacheService, Depends(get_cache_service)],
+):
     """Get cache statistics. Requires admin API key."""
-
-    if not cache_service:
-        raise HTTPException(status_code=500, detail="Cache service not initialized")
 
     stats = await cache_service.get_cache_stats()
     return {"status": "success", "stats": stats}

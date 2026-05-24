@@ -40,6 +40,8 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: rag_backend
+    volumes:
+      - .:/app
     restart: unless-stopped
     depends_on:
       - postgres

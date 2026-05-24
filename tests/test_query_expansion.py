@@ -107,108 +107,88 @@ async def test_expansion_cache_operations():
 
 
 @pytest.mark.asyncio
-async def test_expansion_endpoint_success():
+async def test_expansion_endpoint_success(expander_mock, cache_mock):
     """Test /expand-query endpoint with valid request."""
     client = TestClient(app)
 
-    # Patch services to return success
-    with (
-        patch("app.main.query_expander") as mock_expander,
-        patch("app.main.cache_service") as mock_cache,
-    ):
-        mock_cache.get_expanded_query = AsyncMock(return_value=None)
-        mock_cache.set_expanded_query = AsyncMock(return_value=True)
-        mock_expander.expand_query.return_value = (
-            "Senior Data Scientist, Python, Machine Learning, TensorFlow"
-        )
+    mock_expander = expander_mock
 
-        response = client.post("/expand-query", json={"query": "data scientist"})
+    mock_expander.expand_query.return_value = (
+        "Senior Data Scientist, Python, Machine Learning, TensorFlow"
+    )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "success"
-        assert data["original_query"] == "data scientist"
-        assert "expanded_query" in data
+    response = client.post("/expand-query", json={"query": "data scientist"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["original_query"] == "data scientist"
+    assert "expanded_query" in data
 
 
 @pytest.mark.asyncio
-async def test_expansion_endpoint_empty_query():
+async def test_expansion_endpoint_empty_query(expander_mock, cache_mock):
     """Test /expand-query endpoint with empty query."""
     client = TestClient(app)
 
-    with patch("app.main.query_expander"), patch("app.main.cache_service"):
-        response = client.post("/expand-query", json={"query": ""})
-        assert response.status_code == 400
-        assert "at least 2 characters" in response.json()["detail"]
+    response = client.post("/expand-query", json={"query": ""})
+    assert response.status_code == 400
+    assert "at least 2 characters" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_expansion_endpoint_short_query():
+async def test_expansion_endpoint_short_query(expander_mock, cache_mock):
     """Test /expand-query endpoint with too short query."""
     client = TestClient(app)
 
-    with patch("app.main.query_expander"), patch("app.main.cache_service"):
-        response = client.post("/expand-query", json={"query": "a"})
-        assert response.status_code == 400
+    response = client.post("/expand-query", json={"query": "a"})
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_expansion_endpoint_with_cache():
+async def test_expansion_endpoint_with_cache(expander_mock, cache_mock):
     """Test that expansion endpoint uses cache."""
     client = TestClient(app)
 
-    with (
-        patch("app.main.cache_service") as mock_cache,
-        patch("app.main.query_expander") as mock_expander,
-    ):
-        # --- Case 1: Cache Miss ---
-        mock_cache.get_expanded_query = AsyncMock(return_value=None)
-        mock_cache.set_expanded_query = AsyncMock(return_value=True)
-        mock_expander.expand_query.return_value = "Expanded Query"
+    mock_expander = expander_mock
+    mock_cache = cache_mock
+    mock_expander.expand_query.return_value = "Expanded Query"
 
-        response = client.post("/expand-query", json={"query": "devops aws"})
-        assert response.status_code == 200
-        assert response.json()["cached"] is False
+    response = client.post("/expand-query", json={"query": "devops aws"})
+    assert response.status_code == 200
+    assert response.json()["cached"] is False
 
-        # --- Case 2: Cache Hit ---
-        mock_cache.get_expanded_query = AsyncMock(
-            return_value="Senior DevOps Engineer, AWS, Docker, Kubernetes"
-        )
+    # --- Case 2: Cache Hit ---
+    mock_cache.get_expanded_query = AsyncMock(
+        return_value="Senior DevOps Engineer, AWS, Docker, Kubernetes"
+    )
 
-        response = client.post("/expand-query", json={"query": "devops aws"})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["cached"] is True
-        assert (
-            data["expanded_query"] == "Senior DevOps Engineer, AWS, Docker, Kubernetes"
-        )
+    response = client.post("/expand-query", json={"query": "devops aws"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cached"] is True
+    assert data["expanded_query"] == "Senior DevOps Engineer, AWS, Docker, Kubernetes"
 
 
 @pytest.mark.asyncio
-async def test_expansion_endpoint_with_filters():
+async def test_expansion_endpoint_with_filters(expander_mock, cache_mock):
     """Test that expansion endpoint accepts SearchRequest with filters."""
     client = TestClient(app)
 
-    with (
-        patch("app.main.query_expander") as mock_expander,
-        patch("app.main.cache_service") as mock_cache,
-    ):
-        mock_cache.get_expanded_query = AsyncMock(return_value=None)
-        mock_cache.set_expanded_query = AsyncMock(return_value=True)
-        mock_expander.expand_query.return_value = (
-            "Senior Python Developer, Django, Flask"
-        )
+    mock_expander = expander_mock
 
-        response = client.post(
-            "/expand-query",
-            json={
-                "query": "python",
-                "location": "New York",
-                "min_experience": 5,
-                "top_k": 10,
-            },
-        )
-        assert response.status_code == 200
+    mock_expander.expand_query.return_value = "Senior Python Developer, Django, Flask"
+
+    response = client.post(
+        "/expand-query",
+        json={
+            "query": "python",
+            "location": "New York",
+            "min_experience": 5,
+            "top_k": 10,
+        },
+    )
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -234,28 +214,22 @@ async def test_expansion_cache_invalidation():
 
 
 @pytest.mark.asyncio
-async def test_expansion_rate_limiting():
+async def test_expansion_rate_limiting(expander_mock, cache_mock):
     """Test that expansion endpoint has rate limiting."""
     limiter.enabled = True
 
     client = TestClient(app)
 
-    # Mock services to avoid 500 errors inside the loop
-    with (
-        patch("app.main.query_expander") as mock_expander,
-        patch("app.main.cache_service") as mock_cache,
-    ):
-        mock_cache.get_expanded_query = AsyncMock(return_value=None)
-        mock_cache.set_expanded_query = AsyncMock(return_value=True)
-        mock_expander.expand_query.return_value = "Expanded"
+    mock_expander = expander_mock
+    mock_expander.expand_query.return_value = "Expanded"
 
-        # Make multiple requests
-        responses = []
-        for i in range(25):  # Rate limit is 20/hour
-            response = client.post("/expand-query", json={"query": f"test query {i}"})
-            responses.append(response.status_code)
+    # Make multiple requests
+    responses = []
+    for i in range(25):  # Rate limit is 20/hour
+        response = client.post("/expand-query", json={"query": f"test query {i}"})
+        responses.append(response.status_code)
 
-        assert 429 in responses, "Expected at least one request to be rate limited"
+    assert 429 in responses, "Expected at least one request to be rate limited"
 
 
 @pytest.mark.asyncio

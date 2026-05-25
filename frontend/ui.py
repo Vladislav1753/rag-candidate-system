@@ -1,9 +1,12 @@
+import os
+
 import requests
 import streamlit as st
+from dotenv import load_dotenv
 
-from app.core.config import settings
+load_dotenv()
 
-API_URL = settings.app.api_url
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 
 st.set_page_config(page_title="RAG Recruiter AI", page_icon="🤖", layout="wide")
@@ -36,7 +39,7 @@ with tab1:
 
         try:
             response = requests.post(
-                f"{API_URL}/expand-query",
+                f"{API_URL}/queries/expand",
                 json={"query": current_query},
                 timeout=30,
             )
@@ -123,7 +126,7 @@ with tab1:
 
             with st.spinner("Searching database..."):
                 try:
-                    response = requests.post(f"{API_URL}/search", json=payload)
+                    response = requests.post(f"{API_URL}/candidates", json=payload)
 
                     if response.status_code == 200:
                         results = response.json().get("results", [])
@@ -210,7 +213,7 @@ with tab2:
                     }
 
                     response = requests.post(
-                        f"{API_URL}/extract", files=files, timeout=60
+                        f"{API_URL}/cvs/extract", files=files, timeout=60
                     )
 
                     if response.status_code == 200:
@@ -359,7 +362,9 @@ with tab2:
                 }
 
                 try:
-                    resp = requests.post(f"{API_URL}/onboarding", json=payload)
+                    resp = requests.post(
+                        f"{API_URL}/candidates/onboarding", json=payload
+                    )
                     if resp.status_code == 200:
                         st.balloons()
                         st.success(f"Successfully added {f_name}!")

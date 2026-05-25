@@ -1,14 +1,36 @@
+import logging
+import secrets
 from collections.abc import Callable
 from typing import TypeVar
 
 import asyncpg
-from fastapi import HTTPException, Request
+from fastapi import (
+    Header,
+    HTTPException,
+    Request,
+)
 
 from app.core.cache import CacheService
+from app.core.config import settings
 from rag.agents.query_expansion_agent import QueryExpansionAgent
 from rag.reranker import RerankerService
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
+
+
+async def verify_admin(x_api_key: str = Header(..., alias="X-API-Key")):
+    """
+    Verify admin API key for protected endpoints.
+    Uses secrets.compare_digest to prevent timing attacks.
+    """
+    if not settings.app.admin_api_key:
+        logger.error("ADMIN_API_KEY is not configured")
+        raise HTTPException(status_code=500, detail="Admin API key is not configured")
+
+    if not secrets.compare_digest(x_api_key, settings.app.admin_api_key):
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    return x_api_key
 
 
 def get_app_state_resource(

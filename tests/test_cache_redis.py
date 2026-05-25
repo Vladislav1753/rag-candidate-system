@@ -141,14 +141,14 @@ async def test_cache_key_generation():
 
 
 def test_cache_invalidate_without_api_key(client, cache_mock):
-    """Test that /cache/invalidate is protected."""
-    response = client.post("/cache/invalidate")
+    """Test that DELETE /cache is protected."""
+    response = client.delete("/cache")
     assert response.status_code == 422
 
 
 def test_cache_invalidate_with_invalid_api_key(client, cache_mock):
-    """Test that /cache/invalidate rejects invalid API key."""
-    response = client.post("/cache/invalidate", headers={"X-API-Key": "wrong-key"})
+    """Test that DELETE /cache rejects invalid API key."""
+    response = client.delete("/cache", headers={"X-API-Key": "wrong-key"})
     assert response.status_code == 403
     assert "Invalid or missing API key" in response.json()["detail"]
 
@@ -167,9 +167,10 @@ def test_cache_stats_with_invalid_api_key(client, cache_mock):
 
 
 def test_cache_invalidate_with_valid_api_key(client, cache_mock):
-    """Test that /cache/invalidate works with valid API key."""
-    response = client.post(
-        "/cache/invalidate",
+    """Test that DELETE /cache works with valid API key."""
+    response = client.request(
+        "DELETE",
+        "/cache",
         headers={"X-API-Key": "test-admin-key-123"},
         json={"scopes": ["search"]},
     )

@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import get_cache_service, get_query_expander  # noqa: E402
-from app.core import CacheService, init_redis_pool  # noqa: E402
+from app.core.cache import CacheService, init_redis_pool  # noqa: E402
 from app.main import app  # noqa: E402
 from app.middleware.rate_limit import limiter  # noqa: E402
 

@@ -136,7 +136,7 @@ Useful when:
 - You want to force fresh results
 
 ```bash
-POST /cache/invalidate
+DELETE /cache
 X-API-Key: your-admin-api-key
 
 Response:
@@ -179,13 +179,13 @@ pytest tests/test_cache_redis.py::test_cache_key_generation -v
 
 2. **After bulk data updates:**
    ```bash
-   curl -X POST http://localhost:8000/cache/invalidate
+   curl -X DELETE http://localhost:8000/cache
    ```
 
 3. **Scheduled maintenance:**
    ```bash
    # Run daily at 3 AM
-   0 3 * * * curl -X POST http://localhost:8000/cache/invalidate
+   0 3 * * * curl -X DELETE http://localhost:8000/cache
    ```
 
 ### Cache Key Design

@@ -291,7 +291,7 @@ curl http://localhost:8000/cache/stats \
 ### Cache Invalidation
 
 ```bash
-curl -X POST http://localhost:8000/cache/invalidate \
+curl -X DELETE http://localhost:8000/cache \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your_admin_api_key_here" \
   -d "{\"scopes\": [\"search\", \"expand\"]}"

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+  signal — a relevance instrument for recruiters.
+  One disciplined accent (cobalt) on warm paper; Space Grotesk + Space Mono.
+*/
+
+@theme inline {
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+
+  --color-canvas: #eceae2;
+  --color-surface: #ffffff;
+  --color-ink: #15151b;
+  --color-muted: #6c6c77;
+  --color-faint: #9a9aa3;
+  --color-line: #e2e0d6;
+  --color-line-strong: #d4d2c6;
+  --color-cobalt: #1b29ff;
+  --color-cobalt-deep: #0a18d8;
+  --color-cobalt-soft: #eceaff;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-cobalt);
+    color: #fff;
+  }
+
+  /* Visible keyboard focus everywhere; quality floor, not announced. */
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+@layer utilities {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  .data {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Paper grain: a near-invisible texture so flat fills don't read as a template. */
+  .grain {
+    position: relative;
+  }
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: radial-gradient(var(--color-ink) 0.5px, transparent 0.5px);
+    background-size: 4px 4px;
+  }
+}
+
+/* Staggered reveal for search results. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}

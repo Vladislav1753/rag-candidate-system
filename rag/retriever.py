@@ -40,9 +40,11 @@ async def search_candidates(
     args = []
 
     if filters.get("location"):
-        args.append(filters["location"])
+        # Stored locations are full "City, Country" strings (e.g. "London, UK"),
+        # so match case-insensitively on a substring rather than exact equality.
+        args.append(f"%{filters['location']}%")
         # Dynamic parameter index: $1, $2, etc.
-        where_clauses.append(f"location = ${len(args)}")
+        where_clauses.append(f"location ILIKE ${len(args)}")
 
     if filters.get("min_experience"):
         args.append(filters["min_experience"])

@@ -2,7 +2,7 @@ DC = docker compose -f docker-compose.yml
 PYTHON = .venv/Scripts/python.exe
 
 install:
-	uv sync --group dev --extra frontend --extra evaluation
+	uv sync --group dev --extra evaluation
 
 test:
 	$(PYTHON) -m pytest

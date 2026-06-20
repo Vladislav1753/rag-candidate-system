@@ -59,18 +59,17 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: rag_frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "8501:8501"
-    env_file:
-      - .env
+      - "3000:3000"
     environment:
-      API_URL: http://backend:8000
+      # The /api/* proxy forwards to the backend service on the compose network.
+      BACKEND_URL: http://backend:8000
     networks:
       - rag_net
 

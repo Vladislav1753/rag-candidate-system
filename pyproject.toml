@@ -26,21 +26,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-frontend = [
-    "httpx>=0.28.1",
-    "requests>=2.31.0",
-    "streamlit>=1.52.1",
-]
 evaluation = [
     "faiss-cpu>=1.7.4",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "mypy>=1.19.1",
     "pre-commit>=4.0.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "requests>=2.31.0",
     "ruff>=0.15.0",
 ]
 
